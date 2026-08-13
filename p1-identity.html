@@ -315,6 +315,7 @@ function gauge(total){
   $("#gauge").textContent =
     `폰 ${getComputedStyle(document.documentElement).getPropertyValue("--phoneW").trim()}`
     + `×${getComputedStyle(document.documentElement).getPropertyValue("--phoneH").trim()}`
+    + ` · 판 ${Bus.build}/${Bus.mode()}`
     + ` · 받은 유형 ${TYPES[picked].name}(${TYPES[picked].frame})`
     + ` · 연출 ${(total/1000).toFixed(1)}초 = 스캔 ${T.scan}×${SCANS}번 + 읽는 중 ${T.read}`
     + ` + 슬롯 ${T.slot} + 멈춤 ${T.stop} + 엠블럼 ${T.draw}ms`

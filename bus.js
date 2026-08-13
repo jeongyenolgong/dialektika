@@ -16,6 +16,7 @@
    화면 대응표(8.1)는 이 파일 한 곳에만 있다. 흩어 두면 어긋난다.
    ───────────────────────────────────────────────────────────────────────── */
 (() => {
+  const BUILD  = "260813-4";     /* 화면마다 조작줄에 뜹니다 — 폰이 옛 것을 물고 있는지 가릅니다 */
   const K_BOOK = "dlk.book", K_SAY = "dlk.say";
   const ROOM   = new URLSearchParams(location.search).get("room") || "nolgong";
   const BROKER = "wss://broker.emqx.io:8084/mqtt";
@@ -115,6 +116,7 @@
     press:  () => book.press,
     players: () => book.players || [],
     mode:   () => mode,
+    build:  BUILD,
     room:   ROOM,
     role,
 

@@ -547,7 +547,7 @@ function gauge(){
   : stage === "result" ? ""
                        : ` · 유형별 ${byType()}`;
   document.getElementById("gauge").textContent =
-    `${innerWidth}×${innerHeight} · ${label} · 접속 ${people.length}명 · ${layout().length}팀`
+    `판 ${Bus.build}/${Bus.mode()} · ${label} · 접속 ${people.length}명 · ${layout().length}팀`
     + tail + (noted ? ` · ${noted}` : "");
 }
 
