@@ -16,7 +16,7 @@
    화면 대응표(8.1)는 이 파일 한 곳에만 있다. 흩어 두면 어긋난다.
    ───────────────────────────────────────────────────────────────────────── */
 (() => {
-  const BUILD  = "260813-9";     /* 화면마다 조작줄에 뜹니다 — 폰이 옛 것을 물고 있는지 가릅니다 */
+  const BUILD  = "260813-10";     /* 화면마다 조작줄에 뜹니다 — 폰이 옛 것을 물고 있는지 가릅니다 */
   const K_BOOK = "dlk.book", K_SAY = "dlk.say";
   const ROOM   = new URLSearchParams(location.search).get("room") || "nolgong";
   const BROKER = "wss://broker.emqx.io:8084/mqtt";
@@ -54,6 +54,15 @@
     : /^p\d/.test(here)           ? "phone"
     : null;
 
+  /* ⭐ 목업 전용 조작줄은 **폰에서만** 감춥니다 — 참가자가 보는 화면입니다.
+     진행자 화면과 스크린은 그대로 둡니다(진행자가 계기판으로 씁니다).
+     내가 검사할 때는 주소에 ?dev=1 을 붙여 다시 꺼냅니다.               */
+  if (/^(p\d|reconnect)/.test(here) && !new URLSearchParams(location.search).get("dev")) {
+    const css = document.createElement("style");
+    css.textContent = ".ctl{display:none !important}";
+    (document.head || document.documentElement).appendChild(css);
+  }
+
   let book = { press: 0, players: [] };
   const outbox = [];                            /* 아직 장부에서 확인 못 한 말들 */
   const drop = it => { const i = outbox.indexOf(it); if (i >= 0) outbox.splice(i, 1); };
@@ -80,7 +89,7 @@
     /* ⭐ 화면을 옮길 때 떨어지면 안 되는 값 둘.
        room — 떨어지면 그 기기만 다른 장부를 보게 된다
        t    — p3 대기가 유형을 잃으면 엠블럼이 바뀐다                        */
-    ["room", "t", "me"].forEach(k => {
+    ["room", "t", "me", "dev"].forEach(k => {
       if (now.get(k) !== null && !url.searchParams.has(k)) url.searchParams.set(k, now.get(k));
     });
 
