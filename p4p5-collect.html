@@ -435,8 +435,8 @@ $("#ent").onclick = () => {
   pairs.push({c:cur.c, w:cur.w, m:mine});
   /* 진행자 화면이 받아 적습니다 — 세는 곳이 하나여야 스크린과 어긋나지 않습니다 */
   const nth = pairs.length;                    /* 이 쌍이 몇 번째인가 */
-  Bus.sayUntil({pair:{id:Bus.me(), code:cur.c, word:cur.w, mine}},
-               b => ((Bus.mine(b) || {}).got || 0) >= nth);
+  Bus.sayUntil({pair:{id:Bus.me(), nth, code:cur.c, word:cur.w, mine}},
+               b => ((((b.ack||{})[Bus.me()]||{}).p)||[]).includes(nth));
   /* 폰 안에도 적어 둡니다 — P6가 이 쌍으로 카드를 만듭니다 (6.4 ⑦) */
   localStorage.setItem("dlk.pairs." + Bus.me(), JSON.stringify(pairs));
   const fly = $("#fly"), mid = $("#v5mid"), kb = $("#kb");
@@ -524,11 +524,11 @@ const TOAST_MS = 3500;
 let toastTimer = null;
 /* ⭐ 개인 알림은 **1·2·3위**에게 갑니다 (2026.08.12 사용자 "123위에게는 알람 가게 하자").
       1위 하나로 좁혀 두었던 안은 폐기 — 문구는 등수만 갈아 끼웁니다 */
-function toast(which, no){
+function toast(which, no, team){
   const t = $("#toast");
   t.innerHTML = which === 1
     ? `현재 ${no}위`
-    : `CREATIVE RISK-TAKERS<br>2위 → 1위`;
+    : (team || `CREATIVE RISK-TAKERS<br>2위 → 1위`);
   clearTimeout(toastTimer);
   t.classList.add("on");
   toastTimer = setTimeout(() => t.classList.remove("on"), TOAST_MS);
@@ -631,5 +631,12 @@ if(q.get("v") === "drawer"){
 }
 </script>
 
+<script>
+/* ⭐ 6.12 순위 알림 — 개인은 1·2·3위에게, 팀은 그 팀 전원에게.
+      수집이면 모은 쌍 수로 셉니다. 문구는 두 단계가 같습니다. */
+Bus.watchRank("got",
+  no => toast(1, no),
+  (label, from, to) => toast(2, 0, `${label}<br>${from}위 → ${to}위`));
+</script>
 </body>
 </html>

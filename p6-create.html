@@ -301,8 +301,8 @@ $("#ent").onclick = () => {
   c.s = mine;
   /* 진행자 화면이 받아 적습니다 — 투표에서 남의 문장이 뜨려면 장부에 있어야 합니다 */
   const nth = CARDS.filter(x => x.s).length;   /* 이게 몇 번째 문장인가 */
-  Bus.sayUntil({sentence:{id:Bus.me(), word:c.je, pair:c.ban, text:c.s}},
-               b => ((Bus.mine(b) || {}).sent || 0) >= nth);
+  Bus.sayUntil({sentence:{id:Bus.me(), nth, word:c.je, pair:c.ban, text:c.s}},
+               b => ((((b.ack||{})[Bus.me()]||{}).s)||[]).includes(nth));
   mine = ""; $("#hidden").value = "";
   $("#kb").classList.remove("on"); $("#mid").classList.remove("kbup"); $("#msg").textContent = "";
   /* 번쩍이지 않고 **곧바로 다음 카드**로 갑니다 — 앉은 문장을 확인시키지 않습니다
@@ -427,5 +427,12 @@ if(q.get("v") === "typing") later(60, () => {
 });
 </script>
 
+<script>
+/* ⭐ 6.12 순위 알림 — 개인은 1·2·3위에게, 팀은 그 팀 전원에게.
+      창작이면 쓴 문장 수로 셉니다. 문구는 두 단계가 같습니다. */
+Bus.watchRank("sent",
+  no => toast(1, no),
+  (label, from, to) => toast(2, 0, `${label}<br>${from}위 → ${to}위`));
+</script>
 </body>
 </html>

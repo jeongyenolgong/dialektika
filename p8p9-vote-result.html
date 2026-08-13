@@ -229,7 +229,7 @@ function choose(i){
   if(myDuels && pairIdx){                       /* 닿을 때까지 말합니다 */
     const k = round - 1;
     Bus.sayUntil({vote:{id:Bus.me(), k, win:pairIdx[i]}},
-                 b => ((Bus.mine(b) || {}).votes || 0) > k);
+                 b => ((((b.ack||{})[Bus.me()]||{}).v)||[]).includes(k));
   }
   later(HOLD, () => cards.forEach(c => c.classList.add("gone")));
   later(HOLD + FADE, () => {

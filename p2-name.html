@@ -222,9 +222,15 @@ enter.onclick = () => {
   if(!name.length) return;
   $("#flash").style.display = "block";
   later(T.flash*0.3, () => $("#flash").style.display = "none");
-  /* 장부에 내 이름이 보일 때까지 다시 말합니다 — 한 번 보낸 말은 사라질 수 있습니다 */
-  Bus.sayUntil({name:{id:Bus.me(), name}}, b => (Bus.mine(b) || {}).name === name);
-  later(T.flash, () => Bus.go("p3-wait.html", {t:picked}));
+  /* ⛔ 장부에 이름이 닿은 것을 **보고 나서** 넘어갑니다.
+        곧바로 넘어가면 이 화면이 사라지면서 다시 말할 기회도 같이 사라집니다 —
+        말 한 마디가 유실되면 그 사람은 끝까지 이름 없는 사람이 됩니다.        */
+  const sent = name;
+  let gone = false;
+  const goNext = () => { if(gone) return; gone = true; Bus.go("p3-wait.html", {t:picked}); };
+  Bus.sayUntil({name:{id:Bus.me(), name:sent}}, b => (Bus.mine(b) || {}).name === sent);
+  Bus.onState(b => { if((Bus.mine(b) || {}).name === sent) goNext(); });
+  later(8000, goNext);                    /* 그래도 안 닿으면 멈춰 세우지는 않습니다 */
 };
 
 function gauge(){

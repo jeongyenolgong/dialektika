@@ -16,7 +16,7 @@
    화면 대응표(8.1)는 이 파일 한 곳에만 있다. 흩어 두면 어긋난다.
    ───────────────────────────────────────────────────────────────────────── */
 (() => {
-  const BUILD  = "260813-5";     /* 화면마다 조작줄에 뜹니다 — 폰이 옛 것을 물고 있는지 가릅니다 */
+  const BUILD  = "260813-9";     /* 화면마다 조작줄에 뜹니다 — 폰이 옛 것을 물고 있는지 가릅니다 */
   const K_BOOK = "dlk.book", K_SAY = "dlk.say";
   const ROOM   = new URLSearchParams(location.search).get("room") || "nolgong";
   const BROKER = "wss://broker.emqx.io:8084/mqtt";
@@ -45,6 +45,7 @@
     null,                          /* 7 · 종료 */
   ];
 
+  const TYPE_NAMES = ["CULTURE VANGUARD", "CREATIVE RISK-TAKERS", "RELENTLESS INNOVATORS"];
   const here = location.pathname.split("/").pop() || "index.html";
   const role =
       here.startsWith("screen-")  ? "screen"
@@ -63,7 +64,14 @@
   function follow(n) {
     const table = role === "screen" ? SCREEN : role === "phone" ? PHONE : null;
     if (!table) return;
-    const target = table[n];
+    let target = table[n];
+    /* ⭐ 새 판이 열리면(누름 0) 뒷단계에 있던 폰은 처음 화면으로 돌아옵니다.
+       판 번호를 못 봤어도 장부만 보고 판단하므로 놓치지 않습니다.
+       ⛔대기 화면(P3)은 빼야 합니다 — 입장 중에 거기서 기다리는 게 정상입니다 */
+    if (n === 0 && role === "phone" &&
+        ["p4p5-collect.html", "p6-create.html", "p8p9-vote-result.html"].includes(here)) {
+      target = "p1-identity.html";
+    }
     if (!target) return;                          /* 그대로 둔다 */
 
     const now = new URLSearchParams(location.search);
@@ -87,8 +95,18 @@
     location.replace(file + url.search);
   }
 
+  let lastGen = null;
   function gotBook(next) {
     if (!next || typeof next !== "object") return;
+    /* ⭐ 진행자가 「종료」를 누르면 판 번호가 오릅니다 — 폰은 처음 화면으로 */
+    if (typeof next.gen === "number") {
+      if (lastGen !== null && next.gen !== lastGen && role === "phone") {
+        try { localStorage.removeItem("dlk.pairs." + window.Bus.me()); } catch (e) {}
+        lastGen = next.gen;
+        return window.Bus.go("p1-identity.html");
+      }
+      lastGen = next.gen;
+    }
     const before = book.press;
     book = { press: 0, players: [], ...next };
     outbox.slice().forEach(it => { try { if (it.isDone(book)) drop(it); } catch (e) {} });
@@ -146,6 +164,51 @@
     },
     /* 장부에서 나를 찾는다 */
     mine(b) { const id = this.me(); return ((b || book).players || []).find(p => p.id === id); },
+
+    /* 5.5 — 어떤 유형이 10명을 넘으면 그 유형만 1·2로 갈립니다 */
+    teams(P) {
+      const out = [];
+      [0, 1, 2].forEach(t => {
+        const mine = (P || []).filter(p => p.type === t);
+        if (mine.length > 10) {
+          out.push({ t, n:1, label:TYPE_NAMES[t] + " 1", members:mine.filter(p => (p.idxInType||0) % 2 === 0) });
+          out.push({ t, n:2, label:TYPE_NAMES[t] + " 2", members:mine.filter(p => (p.idxInType||0) % 2 === 1) });
+        } else {
+          out.push({ t, n:0, label:TYPE_NAMES[t], members:mine });
+        }
+      });
+      return out;
+    },
+
+    /* ⭐ 6.12 순위 알림 — P4·P5·P6에 같은 것이 걸립니다.
+       basis: 수집이면 "got", 창작이면 "sent".
+       개인은 **1·2·3위에 들었을 때 그 세 사람에게만**,
+       팀은 **우리 팀 순위가 바뀌었을 때 팀원 전원에게**.               */
+    watchRank(basis, onSelf, onTeam) {
+      let lastSelf = 0, lastTeam = 0;
+      this.onState(b => {
+        const P = (b.players || []).filter(p => p.name);
+        const me = this.mine(b);
+        if (!me || !P.length) return;
+
+        const ranked = [...P].sort((x, y) => (y[basis]||0) - (x[basis]||0) || (x.at||0) - (y.at||0));
+        const mineNo = ranked.findIndex(p => p.id === me.id) + 1;
+        /* ⛔아직 하나도 못 모은 동안의 등수는 기억하지 않습니다 —
+           기억해 버리면 첫 알림이 「바뀐 적 없다」로 막힙니다 */
+        if ((me[basis]||0) > 0) {
+          if (mineNo >= 1 && mineNo <= 3 && mineNo !== lastSelf) onSelf(mineNo);
+          lastSelf = mineNo;
+        }
+
+        const cols = this.teams(P).map(c => ({ ...c,
+          avg: c.members.length ? c.members.reduce((n, m) => n + (m[basis]||0), 0) / c.members.length : 0,
+          at:  Math.max(0, ...c.members.map(m => m.at || 0)) }))
+          .sort((a, c) => c.avg - a.avg || a.at - c.at);
+        const teamNo = cols.findIndex(c => c.members.some(p => p.id === me.id)) + 1;
+        if (teamNo > 0 && lastTeam > 0 && teamNo !== lastTeam) onTeam(cols[teamNo-1].label, lastTeam, teamNo);
+        if (teamNo > 0) lastTeam = teamNo;
+      });
+    },
 
     /* 듣기 */
     onState(fn)  { onBook.push(fn); if (mode !== "찾는 중") fn(book); },

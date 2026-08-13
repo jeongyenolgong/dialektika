@@ -272,8 +272,11 @@ const PRESSES = [
   {at:"vote",    l1:"투표를 종료하고 결과를 발표합니다",
                  l2:"아직 투표 중인 참가자가 있으면 그대로 끊깁니다. 스크린과 참가자 화면에 결과가 함께 뜹니다.",
                  go:"발표", warn:true, act(){ clearAll(); stage = "result"; }},
-  {at:"result",  l1:"워크숍을 종료합니다", l2:"",
-                 go:"종료", act(){ note("워크숍 종료"); }},
+  /* ⭐ 「종료」는 판을 닫고 **새 판을 엽니다** — 플레이 테스트를 이어서 하기 위한 것입니다.
+        참가자 폰도 처음 화면으로 돌아가고, 앞판의 결과는 이 순간 지워집니다.        */
+  {at:"result",  l1:"워크숍을 종료하고 새 판을 엽니다",
+                 l2:"이 판의 결과가 지워지고 참가자 폰이 전부 처음 화면으로 돌아갑니다.",
+                 go:"종료", warn:true, act(){ newGame(); }},
 ];
 
 /* 5.5 — 어떤 유형이 10명을 넘으면 그 유형만 1·2로 갈린다.
@@ -554,6 +557,21 @@ function gauge(){
     + tail + (noted ? ` · ${noted}` : "");
 }
 
+/* 새 판 — 장부를 비우고 판 번호를 올립니다. 폰은 그 번호를 보고 처음으로 돌아갑니다 */
+let gen = 0;
+function newGame(){
+  clearAll();
+  people = []; words = {}; sents = {}; sentences = []; wins = []; duels = {}; ballots = {};
+  Object.keys(ack).forEach(k => delete ack[k]);
+  Object.keys(heard).forEach(k => delete heard[k]);
+  Object.keys(ack).forEach(k => delete ack[k]);
+  seq = 0; stage = "entry"; press = 0; voteStarted = false;
+  noted = "새 판을 열었습니다";
+  gen++;
+  Bus.publish({press:0, players:[], words:{}, sents:{}, sentences:[], duels:{}, wins:[], gen});
+  draw(); gauge();
+}
+
 function run(target){
   clearAll(); people = []; words = {}; sents = {}; sentences = []; wins = []; duels = {}; ballots = {}; seq = 0; stage = "entry"; press = 0; noted = ""; voteStarted = false; draw();
   if(booted) Bus.publish({press:0, players:[]});   /* 프리셋을 다시 누르면 판 전체가 처음으로 */
@@ -582,14 +600,18 @@ function sync(){
       idxInType:p.idxInType, got:p.pairs, sent:p.sentences, at:p.at || 0,
       voted:!!p.voted, score:scoreOf(p.id), votes:Object.keys(ballots[p.id] || {}).length
     })),
-    words, sents, sentences, duels, wins
+    words, sents, sentences, duels, wins, gen, ack
   });
 }
 
 /* 폰이 쌍 하나를 완성할 때마다 — 세는 곳은 여기 하나뿐입니다 */
-function pairReal(id, word){
+function pairReal(id, nth, word){
   const p = people.find(q => q.id === id);
   if(!p) return;
+  const key = `pair:${id}:${nth}`;
+  remember(id, 'p', nth);
+  if(heard[key]) { sync(); return; }             /* 다시 들은 말입니다 */
+  heard[key] = true;
   p.pairs++; p.at = ++seq;
   const w = words[word] || (words[word] = {n:0, at:0});
   w.n++; w.at = seq;
@@ -600,6 +622,15 @@ function pairReal(id, word){
    짝은 진행자 화면이 미리 다 짜서 장부에 올립니다. 폰은 자기 목록을 걸어갈
    뿐입니다 — 그래야 말 한 마디가 사라져도 대결이 없어지지 않습니다 (7.4).  */
 let wins = [], duels = {}, ballots = {};
+const heard = {};      /* 이미 받아 적은 말 — 같은 말이 두 번 와도 한 번만 셉니다 */
+/* ⭐ 받아 적은 말의 번호를 장부에 그대로 남깁니다.
+      폰은 「내 몇 번째 말이 닿았나」를 번호로 확인합니다 —
+      개수로 세면 말이 순서 뒤바뀌어 닿을 때 **유실된 것을 닿았다고 착각**합니다. */
+const ack = {};
+function remember(id, kind, n){
+  const a = ack[id] || (ack[id] = {p:[], s:[], v:[]});
+  if(!a[kind].includes(n)) a[kind].push(n);
+}
 
 /* 이 사람이 어느 열(팀)인가 — 5.5로 갈린 열까지 셉니다 */
 function colOf(p){ return layout().findIndex(c => c.members.includes(p)); }
@@ -649,7 +680,8 @@ function voteReal(id, k, win){
   const p = people.find(q => q.id === id);
   if(!p) return;
   const box = ballots[id] || (ballots[id] = {});
-  if(box[k] !== undefined) return;              /* 같은 대결을 두 번 세지 않습니다 */
+  remember(id, 'v', k);
+  if(box[k] !== undefined) { sync(); return; }   /* 같은 대결을 두 번 세지 않습니다 */
   box[k] = win;
   wins[win] = (wins[win] || 0) + 1;
   p.at = ++seq;
@@ -659,9 +691,13 @@ function voteReal(id, k, win){
 }
 
 /* 폰이 문장 한 편을 제출할 때마다 */
-function sentReal(id, word, pair, text){
+function sentReal(id, nth, word, pair, text){
   const p = people.find(q => q.id === id);
   if(!p) return;
+  const key = `sent:${id}:${nth}`;
+  remember(id, 's', nth);
+  if(heard[key]) { sync(); return; }
+  heard[key] = true;
   p.sentences++; p.at = ++seq;
   const w = sents[word] || (sents[word] = {n:0, at:0});
   w.n++; w.at = seq;
@@ -693,8 +729,8 @@ Bus.onSay(msg => {
   if(!msg) return;
   if(msg.join) joinReal(msg.join.id);
   if(msg.name) nameReal(msg.name.id, msg.name.name);
-  if(msg.pair) pairReal(msg.pair.id, msg.pair.word);
-  if(msg.sentence) sentReal(msg.sentence.id, msg.sentence.word, msg.sentence.pair, msg.sentence.text);
+  if(msg.pair) pairReal(msg.pair.id, msg.pair.nth, msg.pair.word);
+  if(msg.sentence) sentReal(msg.sentence.id, msg.sentence.nth, msg.sentence.word, msg.sentence.pair, msg.sentence.text);
   if(msg.vote) voteReal(msg.vote.id, msg.vote.k, msg.vote.win);
 });
 
@@ -716,7 +752,7 @@ Bus.onState(b => {
     words = b.words || {};
     sents = b.sents || {};
     sentences = b.sentences || [];
-    wins = b.wins || []; duels = b.duels || {};
+    wins = b.wins || []; duels = b.duels || {}; gen = b.gen || 0;
     people.forEach(q => q.voted = (b.players.find(x => x.id === q.id) || {}).voted);
     seq = Math.max(0, ...people.map(p => p.at || 0));
     press = b.press || 0;

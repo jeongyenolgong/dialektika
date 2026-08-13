@@ -18,6 +18,7 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 
 # 장부 — 지금 판의 전부입니다 (bus.js의 book과 같은 것)
 book = {"press": 0, "players": []}
+notes = {"text": ""}          # 검사판이 남기는 기록 — 장부와 섞이면 진행자 화면이 덮어씁니다
 lock = threading.Lock()
 listeners = []                      # 접속해 있는 기기마다 편지함 하나
 
@@ -45,6 +46,15 @@ class Handler(SimpleHTTPRequestHandler):
     # ── 장부가 바뀌면 알려 주는 통로 ────────────────────────────────
     def do_GET(self):
         path = self.path.split("?")[0]
+
+        if path == "/log":                        # 검사 기록을 읽어 간다
+            body = notes["text"].encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
 
         if path == "/state":                      # 장부를 한 번 읽어 간다
             body = json.dumps(book, ensure_ascii=False).encode("utf-8")
@@ -93,6 +103,10 @@ class Handler(SimpleHTTPRequestHandler):
         except json.JSONDecodeError:
             sent = None
         path = self.path.split("?")[0]
+
+        if path == "/log":
+            notes["text"] = json.dumps(sent, ensure_ascii=False) if not isinstance(sent, str) else sent
+            self.send_response(204); self.send_header("Content-Length","0"); self.end_headers(); return
 
         if path == "/say":
             broadcast({"say": sent})              # 남기지 않고 그대로 나눠 준다
