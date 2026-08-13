@@ -124,6 +124,7 @@
     color:var(--line); border:1px solid var(--line); padding:4px 8px; cursor:pointer}
   #gauge{opacity:.8}
 </style>
+<script src="bus.js"></script>
 </head>
 <body>
 
@@ -196,7 +197,9 @@ const EM_GRID = [
 ];
 const TC = ["var(--t0)","var(--t1)","var(--t2)"];
 
-const CARDS = [
+/* ⭐ 카드는 **내가 P4·P5에서 모은 쌍**입니다. 아직 아무것도 안 모았으면
+      아래 흉내 일곱 장으로 떨어집니다(화면 혼자 확인할 때).            */
+const MOCK_CARDS = [
   {je:"따뜻한 감수성", ban:"서늘한 이성", s:""},
   {je:"기존의 틀",     ban:"새로운 시도", s:""},
   {je:"응시",         ban:"곁눈질",     s:""},
@@ -205,6 +208,14 @@ const CARDS = [
   {je:"경계",         ban:"연결",       s:""},
   {je:"물성",         ban:"관념",       s:""}
 ];
+function myCards(){
+  try{
+    const mine = JSON.parse(localStorage.getItem("dlk.pairs") || "[]");
+    if(mine.length) return mine.map(x => ({je:x.w, ban:x.m, s:""}));
+  }catch(e){}
+  return MOCK_CARDS;
+}
+const CARDS = myCards();
 const TYPE_MS = 60, BLINK = 500;
 const $ = s => document.querySelector(s);
 let at = 0, mine = "", caretOn = true, blink = null, timers = [];
@@ -287,7 +298,10 @@ $("#ent").onclick = () => {
     return;
   }
   clearInterval(blink);
-  c.s = mine; mine = ""; $("#hidden").value = "";
+  c.s = mine;
+  /* 진행자 화면이 받아 적습니다 — 투표에서 남의 문장이 뜨려면 장부에 있어야 합니다 */
+  Bus.say({sentence:{id:Bus.me(), word:c.je, pair:c.ban, text:c.s}});
+  mine = ""; $("#hidden").value = "";
   $("#kb").classList.remove("on"); $("#mid").classList.remove("kbup"); $("#msg").textContent = "";
   /* 번쩍이지 않고 **곧바로 다음 카드**로 갑니다 — 앉은 문장을 확인시키지 않습니다
      (2026.08.13 사용자). 마지막 카드였으면 아직 안 쓴 카드를 찾아 갑니다 */
@@ -411,6 +425,5 @@ if(q.get("v") === "typing") later(60, () => {
 });
 </script>
 
-<script src="bus.js"></script>
 </body>
 </html>

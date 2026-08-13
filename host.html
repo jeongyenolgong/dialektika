@@ -552,7 +552,7 @@ function gauge(){
 }
 
 function run(target){
-  clearAll(); people = []; words = {}; seq = 0; stage = "entry"; press = 0; noted = ""; voteStarted = false; draw();
+  clearAll(); people = []; words = {}; sents = {}; sentences = []; seq = 0; stage = "entry"; press = 0; noted = ""; voteStarted = false; draw();
   if(booted) Bus.publish({press:0, players:[]});   /* 프리셋을 다시 누르면 판 전체가 처음으로 */
   document.querySelectorAll("#btns button").forEach(b =>
     b.setAttribute("aria-pressed", String(+b.dataset.n === target)));
@@ -568,6 +568,8 @@ function run(target){
    폰은 「나를 넣어 주세요」라고 말할 뿐이고, 유형과 개인 코드는 여기서 나옵니다.
    한 곳에서 나와야 접속 순서대로 고르게 갈립니다 (6.1 · 5.5).             */
 let words = {};        /* 단어별 수집 수 — 스크린 9.2의 단어 순위가 여기서 나옵니다 */
+let sents = {};        /* 단어별 문장 수 — 스크린 9.3의 단어 순위 */
+let sentences = [];    /* 실제 문장들 — 투표에서 남의 문장이 뜨려면 여기 있어야 합니다 */
 let seq = 0;           /* 몇 번째 사건인가 — 같은 개수일 때 먼저 도달한 쪽이 앞섭니다 */
 
 function sync(){
@@ -576,7 +578,7 @@ function sync(){
       id:p.id, name:p.named ? p.name : "", type:TYPES.indexOf(p.type), code:p.code,
       idxInType:p.idxInType, got:p.pairs, sent:p.sentences, at:p.at || 0
     })),
-    words
+    words, sents, sentences
   });
 }
 
@@ -587,6 +589,17 @@ function pairReal(id, word){
   p.pairs++; p.at = ++seq;
   const w = words[word] || (words[word] = {n:0, at:0});
   w.n++; w.at = seq;
+  bump(p); sync();
+}
+
+/* 폰이 문장 한 편을 제출할 때마다 */
+function sentReal(id, word, text){
+  const p = people.find(q => q.id === id);
+  if(!p) return;
+  p.sentences++; p.at = ++seq;
+  const w = sents[word] || (sents[word] = {n:0, at:0});
+  w.n++; w.at = seq;
+  sentences.push({by:id, word, text});
   bump(p); sync();
 }
 
@@ -615,6 +628,7 @@ Bus.onSay(msg => {
   if(msg.join) joinReal(msg.join.id);
   if(msg.name) nameReal(msg.name.id, msg.name.name);
   if(msg.pair) pairReal(msg.pair.id, msg.pair.word);
+  if(msg.sentence) sentReal(msg.sentence.id, msg.sentence.word, msg.sentence.text);
 });
 
 /* ⛔ 진행자가 실수로 새로고침해도 판이 날아가면 안 됩니다.
@@ -633,6 +647,8 @@ Bus.onState(b => {
     });
     TYPES.forEach(t => people.filter(p => p.type === t).forEach((p,k) => p.idxInType = k));
     words = b.words || {};
+    sents = b.sents || {};
+    sentences = b.sentences || [];
     seq = Math.max(0, ...people.map(p => p.at || 0));
     press = b.press || 0;
     stage = press < PRESSES.length ? PRESSES[press].at : "result";

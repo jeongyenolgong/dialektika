@@ -435,6 +435,8 @@ $("#ent").onclick = () => {
   pairs.push({c:cur.c, w:cur.w, m:mine});
   /* 진행자 화면이 받아 적습니다 — 세는 곳이 하나여야 스크린과 어긋나지 않습니다 */
   Bus.say({pair:{id:Bus.me(), code:cur.c, word:cur.w, mine}});
+  /* 폰 안에도 적어 둡니다 — P6가 이 쌍으로 카드를 만듭니다 (6.4 ⑦) */
+  localStorage.setItem("dlk.pairs", JSON.stringify(pairs));
   const fly = $("#fly"), mid = $("#v5mid"), kb = $("#kb");
   const main = document.querySelector("main");
   const W = main.clientWidth, H = main.clientHeight;
