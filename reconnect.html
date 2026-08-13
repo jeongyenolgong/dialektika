@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>디알렉티카 — 재접속 · 개인 코드 (모바일)</title>
+<style>
+  :root{
+    --bg:#101C8C; --bg-2:#0A1266; --line:#4E60D8; --name:#FFFFFF; --dim:#3A49A8;
+    --t0:#FFC83D; --t1:#FF7A8A; --t2:#5FE6B0;
+    --phoneW:390px; --phoneH:844px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:var(--bg-2); color:var(--name);
+    font-family:"Galmuri11","Apple SD Gothic Neo",monospace;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:1.2vh; padding:1.6vh 0; overflow:hidden}
+  .phone{position:relative; width:var(--phoneW); height:var(--phoneH); background:var(--bg);
+    overflow:hidden; flex:0 0 auto; display:flex; flex-direction:column; transform-origin:50% 0}
+  .phone::after{content:""; position:absolute; inset:0; pointer-events:none; z-index:9;
+    background:repeating-linear-gradient(to bottom, rgba(255,255,255,.045) 0 1px, transparent 1px 3px)}
+
+  /* 헤더 좌우가 비어 있는 유일한 화면입니다 — 아직 아무도 아닌 상태 */
+  /* 게임 이름은 **화면 한가운데**. 서랍이 없고 엠블럼이 나중에 생겨도 안 흔들립니다
+     (2026.08.12 사용자 "서랍이 없으니 그에 맞춰 중앙으로") */
+  .head{flex:0 0 auto; height:56px; position:relative; border-bottom:1px solid var(--line);
+        display:flex; align-items:center}
+  .head .ttl{position:absolute; left:0; right:0; text-align:center;
+             font-size:24px; letter-spacing:.08em; pointer-events:none}
+  #hslot{width:22px; height:22px; margin-left:12px; display:grid;
+         grid-template-columns:repeat(11,2px); grid-template-rows:repeat(11,2px)}
+  #hslot i{width:2px; height:2px; visibility:hidden}
+
+  main{flex:1 1 auto; position:relative; min-height:0; display:flex; flex-direction:column;
+       align-items:center; overflow:hidden}
+  .mid{flex:1 1 auto; display:flex; flex-direction:column; align-items:center;
+       justify-content:center; min-height:0}
+  .guide{font-size:24px; color:var(--name); letter-spacing:.04em; padding:0 16px;
+         text-align:center; word-break:keep-all; min-height:24px}
+
+  /* 슬롯 6칸을 3 + 3으로 끊어 그립니다 — 진행자가 끊어 불러 줍니다 */
+  .slots{display:flex; gap:10px; margin-top:32px}
+  .gap{width:16px}
+  .sl{width:44px; height:60px; border:2px solid var(--line); display:flex;
+      align-items:center; justify-content:center; font-size:30px; line-height:1}
+  .sl.hit{background:var(--name); color:var(--bg); border-color:var(--name)}
+  .sl.full{border-color:var(--name)}
+  .msg{height:24px; margin-top:18px; font-size:24px; color:var(--name)}
+
+  /* 픽셀 숫자판은 P4와 완전히 같습니다 — 새로 그리는 게 아니라 다시 쓰는 것입니다 */
+  .pad{display:grid; grid-template-columns:repeat(3,84px); gap:10px; flex:0 0 auto; margin-bottom:40px}
+  .pad button{font-family:inherit; font-size:24px; height:56px; letter-spacing:.06em;
+    background:transparent; color:var(--name); border:2px solid var(--line); cursor:pointer}
+  .pad button.small{font-size:18px}
+  .pad button.off{color:var(--dim); border-color:var(--dim); cursor:not-allowed}
+
+  /* 복귀 — 엠블럼이 도트로 그려지며 헤더 좌측에 자리 잡습니다(P1의 그 장면) */
+  #welcome{font-size:24px; letter-spacing:.04em; min-height:24px}
+  #nextBtn{font-family:inherit; font-size:24px; letter-spacing:.2em; margin-top:40px;
+    background:transparent; color:var(--name); border:2px solid var(--name);
+    padding:12px 36px; cursor:pointer; visibility:hidden}
+
+  .ctl{flex:0 0 auto; width:min(96vw,940px); border-top:1px solid var(--line); padding-top:.8vh;
+       display:flex; flex-direction:column; align-items:center; gap:.5vh;
+       font-size:12px; color:var(--line); letter-spacing:.06em; text-align:center}
+  .ctl .help b{color:var(--name); font-weight:400}
+  .ctl .row{display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:6px}
+  .ctl button{font-family:inherit; font-size:12px; letter-spacing:.06em; background:transparent;
+    color:var(--line); border:1px solid var(--line); padding:4px 8px; cursor:pointer}
+  #gauge{opacity:.8}
+</style>
+</head>
+<body>
+
+<div class="phone" id="phone">
+  <div class="head">
+    <span id="hslot"></span>
+    <span class="ttl">디알렉티카</span>
+    <span></span>
+  </div>
+
+  <main>
+    <div class="mid" id="mid">
+      <p class="guide" id="guide"></p>
+      <div class="slots" id="slots"></div>
+      <p class="msg" id="msg"></p>
+      <p id="welcome"></p>
+      <button id="nextBtn">다음</button>
+    </div>
+    <div class="pad" id="pad"></div>
+  </main>
+</div>
+
+<div class="ctl">
+  <p class="help">아래 줄은 <b>목업에만 있는 조작줄</b>입니다. 실제 폰에는 없습니다.
+    맞는 코드는 <b>482 193</b>(홍길동) · <b>305 771</b>(김서연)입니다 — 실제로는 진행자가 불러 줍니다.
+    아무 코드나 넣으면 「없는 코드」가 됩니다.</p>
+  <div class="row">
+    <button id="reset">처음부터 다시</button>
+  </div>
+  <p id="gauge"></p>
+</div>
+
+<script>
+/* ── 목업 전용 ────────────────────────────────────────────────
+   재접속 (6.11) — 워크숍 도중 화면을 날려 먹은 사람이 자기 기록으로 돌아오는 길입니다.
+   재접속 QR로만 들어오고, 코드는 **진행자가 얼굴을 보고 알려 줍니다.**
+
+   ⭐ 개인 코드는 **6자리 숫자**입니다 — 포스터 코드(3자리)와 자릿수만으로 갈립니다.
+      숫자라서 **P4의 픽셀 숫자판을 그대로 다시 씁니다**(키보드가 아예 안 올라옵니다).
+   ⭐ 헤더 좌우가 비어 있는 유일한 화면입니다 — 코드를 넣기 전이라 내가 누구인지 모릅니다.
+      **그 빈자리 자체가 「아직 아무도 아닌 상태」를 말합니다.**
+   ⭐ 코드가 맞으면 **엠블럼이 도트로 한 줄씩 그려지며 헤더 좌측에 자리 잡습니다** —
+      P1에서 정체성을 받던 그 장면으로 여기서는 그것을 되찾습니다.
+   ⭐ 복귀 확인에는 **이름이 꼭 들어갑니다** — 이름을 평소 화면에 안 띄우는 원칙의 유일한 예외.
+      남의 코드를 잘못 받아 들어왔을 때 알아챌 유일한 자리입니다.                */
+
+const EM_GRID = [
+  ["███████████","·█·······█·","·█·······█·","·█·██····█·","·█·██··█·█·","·█····██·█·",
+   "·█·█··██·█·","·█····██·█·","·█·······█·","·█···█···█·","·████·████·"],
+  ["███████████","█·········█","█·········█","█··█████··█","█·········█","█·········█",
+   "█·········█","█··█████··█","·█·······█·","··█·····█··","···█████···"],
+  ["····███····","··██···██··","·█·······█·","█··██·██··█","█··██·██··█","█·········█",
+   "█··██·██··█","█··██·██··█","·█·······█·","··██···██··","····███····"]
+];
+const TC = ["var(--t0)","var(--t1)","var(--t2)"];
+const PEOPLE = { "482193": {name:"홍길동", t:0}, "305771": {name:"김서연", t:1} };
+const TYPE_MS = 60, DRAW = 600;
+
+const $ = s => document.querySelector(s);
+let code = "", timers = [], done = false;
+const later = (ms,fn) => timers.push(setTimeout(fn, ms));
+
+function paintSlots(hit){
+  const box = $("#slots"); box.innerHTML = "";
+  for(let i=0;i<6;i++){
+    if(i === 3){ const g = document.createElement("span"); g.className = "gap"; box.appendChild(g); }
+    const s = document.createElement("span");
+    s.className = "sl" + (hit ? " hit" : (code[i] ? " full" : ""));
+    s.textContent = code[i] || "";
+    box.appendChild(s);
+  }
+}
+function buildPad(){
+  const pad = $("#pad"); pad.innerHTML = "";
+  ["1","2","3","4","5","6","7","8","9","DEL","0","ENT"].forEach(k => {
+    const b = document.createElement("button");
+    b.textContent = k; b.dataset.k = k;
+    if(k === "DEL" || k === "ENT") b.className = "small";
+    b.onclick = () => press(k);
+    pad.appendChild(b);
+  });
+  paintPad();
+}
+function paintPad(){
+  $("#pad").querySelector('[data-k="ENT"]').classList.toggle("off", code.length < 6);
+}
+function press(k){
+  if(done) return;
+  if(k === "DEL"){ code = code.slice(0,-1); paintSlots(); paintPad(); return; }
+  if(k === "ENT"){ return enter(); }
+  if(code.length >= 6) return;
+  code += k; paintSlots(); paintPad();
+  const cells = [...$("#slots").querySelectorAll(".sl")];
+  const c = cells[code.length-1];
+  c.classList.add("hit"); later(60, () => c.classList.remove("hit"));
+}
+function enter(){
+  if(code.length < 6) return;
+  const who = PEOPLE[code];
+  if(!who){                       /* 없는 코드 — P4와 같은 얼굴입니다 */
+    $("#msg").textContent = "없는 코드";
+    const box = $("#slots");
+    [0,1,2,3,4,5].forEach(i => later(i*50, () => {
+      box.style.transform = `translateX(${[8,-8,8,-8,4,0][i]}px)`;
+      if(i === 5){ code = ""; paintSlots(); paintPad(); }
+    }));
+    later(1400, () => $("#msg").textContent = "");
+    return;
+  }
+  done = true;
+  $("#msg").textContent = "";
+  paintSlots(true);
+
+  /* 엠블럼이 도트로 한 줄씩 — P1과 같은 순서(위에서 아래로) */
+  const slot = $("#hslot"); slot.innerHTML = "";
+  const cells = [];
+  for(let y=0;y<11;y++) for(let x=0;x<11;x++){
+    const i = document.createElement("i");
+    slot.appendChild(i); cells.push({el:i, x, y});
+  }
+  cells.forEach(c => {
+    if(EM_GRID[who.t][c.y][c.x] !== "█") return;
+    later(Math.floor(c.y/11 * DRAW), () => {
+      c.el.style.background = TC[who.t];
+      c.el.style.visibility = "visible";
+    });
+  });
+
+  /* 「홍길동 님 복귀 완료」가 한 글자씩 찍힙니다 */
+  const line = `${who.name} 님 복귀 완료`;
+  for(let i=1;i<=line.length;i++)
+    later(DRAW + i*TYPE_MS, () => $("#welcome").textContent = line.slice(0,i));
+  later(DRAW + line.length*TYPE_MS + 200, () => {
+    $("#nextBtn").style.visibility = "visible";
+    gauge();
+  });
+  gauge();
+}
+
+/* 「다음」 — 지금 진행 중인 단계의 화면으로. 도착지는 서버가 정합니다 */
+$("#nextBtn").onclick = () => {
+  $("#welcome").textContent = "지금 진행 중인 화면으로 넘어갑니다";
+  $("#nextBtn").style.visibility = "hidden";
+};
+
+function gauge(){
+  $("#gauge").textContent =
+    `폰 390×844 · 개인 코드 6자리(포스터 코드는 3자리) · 슬롯 3+3으로 끊음`
+    + ` · 숫자판은 P4와 같은 12키 · 키보드 안 올라옴`
+    + ` · 엠블럼 그려짐 ${DRAW}ms(P1과 같은 순서) · 복귀 문구 한 글자 ${TYPE_MS}ms`
+    + ` · 헤더 좌우가 비어 있는 유일한 화면 · 서랍도 뒤로도 없음`;
+}
+
+function start(){
+  timers.forEach(clearTimeout); timers = [];
+  code = ""; done = false;
+  $("#hslot").innerHTML = ""; $("#welcome").textContent = ""; $("#msg").textContent = "";
+  $("#nextBtn").style.visibility = "hidden";
+  buildPad(); paintSlots();
+  const g = "진행자에게 개인 코드를 문의하세요";
+  $("#guide").textContent = "";
+  for(let i=1;i<=g.length;i++) later(i*TYPE_MS, () => $("#guide").textContent = g.slice(0,i));
+  gauge();
+}
+$("#reset").onclick = start;
+
+function fit(){
+  const p = $("#phone");
+  const avail = innerHeight - document.querySelector(".ctl").offsetHeight - 40;
+  const s = Math.min(1, avail / 844);
+  p.style.transform = `scale(${s})`;
+  p.style.marginBottom = (844 * (s-1)) + "px";
+}
+addEventListener("resize", fit);
+fit();
+start();
+const q = new URLSearchParams(location.search);
+if(q.get("v") === "back") later(80, () => { code = "482193"; paintSlots(); paintPad(); enter(); });
+</script>
+
+</body>
+</html>

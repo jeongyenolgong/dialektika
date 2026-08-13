@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>디알렉티카 — P3 대기 화면 (모바일)</title>
+<style>
+  :root{
+    --bg:#101C8C; --bg-2:#0A1266; --line:#4E60D8; --name:#FFFFFF;
+    --t0:#FFC83D; --t1:#FF7A8A; --t2:#5FE6B0;      /* 5.2 — 엠블럼에만 */
+    --phoneW:390px; --phoneH:844px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg-2); color:var(--name);
+    font-family:"Galmuri11","Apple SD Gothic Neo",monospace;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:1.2vh; padding:1.6vh 0; overflow:hidden;
+  }
+  .phone{
+    position:relative; width:var(--phoneW); height:var(--phoneH);
+    background:var(--bg); overflow:hidden; flex:0 0 auto;
+    display:flex; flex-direction:column; transform-origin:50% 0;
+  }
+  .phone::after{
+    content:""; position:absolute; inset:0; pointer-events:none; z-index:5;
+    background:repeating-linear-gradient(to bottom,
+      rgba(255,255,255,.045) 0 1px, transparent 1px 3px);
+  }
+
+  /* 헤더 (5.4) — P3에는 서랍 버튼이 없습니다. 내 엠블럼은 계속 떠 있습니다 */
+  .head{flex:0 0 auto; height:56px; display:grid; grid-template-columns:56px 1fr 56px;
+        align-items:center; border-bottom:1px solid var(--line)}
+  .head .ttl{text-align:center; font-size:24px; letter-spacing:.14em}
+  .head .slot{width:22px; height:22px; margin-left:12px}
+
+  /* 문구가 화면의 주인공입니다 — 다른 요소를 최대한 비웁니다 */
+  main{flex:1 1 auto; position:relative; display:flex; flex-direction:column;
+       align-items:center; justify-content:center}
+  #flash{position:absolute; inset:0; background:var(--name); display:none; z-index:6}
+  /* pre-wrap이라야 찍는 중의 끝 공백이 살아 커서가 글자 바로 뒤에 섭니다.
+     ⚠️ 공백을 &nbsp;로 바꾸면 줄이 안 넘어가 커서만 아래로 떨어집니다 */
+  #line{font-size:36px; letter-spacing:.04em; line-height:1.4; text-align:center;
+        padding:0 24px; word-break:keep-all; white-space:pre-wrap}
+  .caret{display:inline-block; width:18px; height:36px; background:var(--name);
+         vertical-align:-4px; margin-left:2px}
+  .caret.off{background:transparent}
+
+  footer.act{flex:0 0 auto; height:140px; display:flex; align-items:center; justify-content:center;
+             font-size:24px; color:var(--line); letter-spacing:.1em}
+
+  /* ── 목업 전용 조작줄 · 확정되면 통째로 지웁니다 ── */
+  .ctl{flex:0 0 auto; width:min(96vw,880px); border-top:1px solid var(--line); padding-top:.8vh;
+       display:flex; flex-direction:column; align-items:center; gap:.5vh;
+       font-size:12px; color:var(--line); letter-spacing:.06em; text-align:center}
+  .ctl .help b{color:var(--name); font-weight:400}
+  .ctl .row{display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:6px}
+  .ctl .lbl{opacity:.9; margin-right:4px}
+  .ctl button{font-family:inherit; font-size:12px; letter-spacing:.06em;
+    background:transparent; color:var(--line); border:1px solid var(--line); padding:4px 8px; cursor:pointer}
+  .ctl button[aria-pressed="true"]{background:var(--name); color:var(--bg-2); border-color:var(--name)}
+  #gauge{opacity:.8}
+</style>
+</head>
+<body>
+
+<div class="phone" id="phone">
+  <div class="head">
+    <span class="slot" id="hslot"></span>
+    <span class="ttl">디알렉티카</span>
+    <span></span>
+  </div>
+
+  <main>
+    <div id="flash"></div>
+    <p id="line"></p>
+  </main>
+
+  <footer class="act"><span id="dots"></span></footer>
+</div>
+
+<div class="ctl">
+  <p class="help">아래 줄은 <b>목업에만 있는 조작줄</b>입니다. 실제 폰에는 없고, 값이 정해지면 통째로 지웁니다.</p>
+  <div class="row">
+    <button id="replay">처음부터 다시 보기</button>
+    <button id="signal">진행자가 「다음」을 누름</button>
+    <span class="lbl">내 유형</span>
+    <span id="types"></span>
+  </div>
+  <p id="gauge"></p>
+</div>
+
+<script>
+/* ── 목업 전용 ────────────────────────────────────────────────
+   P3 — 대기 화면. 입장 후 · 수집 후 · 창작 후 **세 번 재사용**합니다.
+        (투표 뒤에는 대기가 없습니다 — 투표 종료가 곧 결과 발표입니다 · 8.1)
+
+   ⭐ 참가자가 할 수 있는 조작이 하나도 없는 화면입니다. 버튼도 서랍도 없습니다.
+      빠져나오는 길은 진행자 신호뿐입니다.
+   연출 — ① 「잠시만 기다려 주세요」가 한 글자씩 찍힘 ② 커서가 글자 뒤를 따라감
+          ③ 다 찍히면 커서만 깜빡임 ④ 하단 「대기 중」 도트가 하나씩 켜졌다 꺼짐(무한)
+          ⑤ 진행자 신호가 오면 화면 번쩍 → 다음 화면
+
+   ⛔ 베네치아와 방향이 반대입니다 — 글자를 쳐서 없애는 게 아니라 저절로 찍힙니다(5.3). */
+
+const TYPES = [
+  {name:"CULTURE VANGUARD",      color:"var(--t0)"},
+  {name:"CREATIVE RISK-TAKERS",  color:"var(--t1)"},
+  {name:"RELENTLESS INNOVATORS", color:"var(--t2)"}
+];
+const EM_GRID = [
+  ["███████████","·█·······█·","·█·······█·","·█·██····█·","·█·██··█·█·","·█····██·█·",
+   "·█·█··██·█·","·█····██·█·","·█·······█·","·█···█···█·","·████·████·"],
+  ["███████████","█·········█","█·········█","█··█████··█","█·········█","█·········█",
+   "█·········█","█··█████··█","·█·······█·","··█·····█··","···█████···"],
+  ["····███····","··██···██··","·█·······█·","█··██·██··█","█··██·██··█","█·········█",
+   "█··██·██··█","█··██·██··█","·█·······█·","··██···██··","····███····"]
+];
+
+const TEXT = "잠시만 기다려 주세요";     /* 6.3 확정 — 세 번 모두 같은 문구 */
+const TYPE_MS = 90;                      /* 한 글자 찍히는 간격 — 제안값 */
+const BLINK = 500, DOT_MS = 400;
+
+const $ = s => document.querySelector(s);
+let picked = 0, timers = [], blink = null, dotTimer = null, caretOn = true, shown = 0;
+const later = (ms,fn) => timers.push(setTimeout(fn, ms));
+
+function emblemSVG(t, px){
+  let r = "";
+  EM_GRID[t].forEach((row,y) => [...row].forEach((ch,x) => {
+    if(ch === "█") r += `<rect x="${x}" y="${y}" width="1" height="1" fill="${TYPES[t].color}"/>`;
+  }));
+  return `<svg width="${px}" height="${px}" viewBox="0 0 11 11" shape-rendering="crispEdges">${r}</svg>`;
+}
+
+function paint(){
+  $("#line").innerHTML =
+    TEXT.slice(0, shown)
+    + `<span class="caret${caretOn ? "" : " off"}"></span>`;
+}
+
+function run(){
+  timers.forEach(clearTimeout); timers = [];
+  clearInterval(blink); clearInterval(dotTimer);
+  $("#hslot").innerHTML = emblemSVG(picked, 22);
+  $("#flash").style.display = "none";
+  shown = 0; caretOn = true; paint();
+
+  /* ①② 한 글자씩 찍히고 커서가 뒤를 따라갑니다 */
+  for(let i=1;i<=TEXT.length;i++) later(i*TYPE_MS, () => { shown = i; paint(); });
+
+  /* ③ 다 찍히면 커서만 깜빡입니다 */
+  later(TEXT.length*TYPE_MS, () => {
+    blink = setInterval(() => { caretOn = !caretOn; paint(); }, BLINK);
+  });
+
+  /* ④ 하단 「대기 중」 도트가 하나씩 켜졌다 꺼집니다 (무한) */
+  let n = 0;
+  dotTimer = setInterval(() => {
+    n = (n + 1) % 4;
+    $("#dots").textContent = "대기 중" + "·".repeat(n);
+  }, DOT_MS);
+  $("#dots").textContent = "대기 중";
+  gauge();
+}
+
+/* ⑤ 진행자 신호 — 화면이 번쩍하고 다음 화면으로 넘어갑니다 */
+$("#signal").onclick = () => {
+  $("#flash").style.display = "block";
+  later(60, () => $("#flash").style.display = "none");
+};
+
+function gauge(){
+  $("#gauge").textContent =
+    `폰 390×844 · 내 유형 ${TYPES[picked].name} · 헤더 엠블럼 22px`
+    + ` · 문구 「${TEXT}」 36px · 한 글자 ${TYPE_MS}ms (${TEXT.length}자 = `
+    + `${(TEXT.length*TYPE_MS/1000).toFixed(1)}초) · 커서 ${BLINK}ms · 대기 중 도트 ${DOT_MS}ms`
+    + ` · 버튼 없음 · 서랍 없음`;
+}
+
+const typesBox = $("#types");
+TYPES.forEach((t,i) => {
+  const b = document.createElement("button");
+  b.textContent = t.name.split(" ")[0]; b.dataset.v = i;
+  b.onclick = () => {
+    picked = i;
+    [...typesBox.children].forEach(x => x.setAttribute("aria-pressed", String(+x.dataset.v === i)));
+    run();
+  };
+  typesBox.appendChild(b);
+});
+$("#replay").onclick = run;
+
+function fit(){
+  const p = $("#phone");
+  const avail = innerHeight - document.querySelector(".ctl").offsetHeight - 40;
+  const s = Math.min(1, avail / 844);
+  p.style.transform = `scale(${s})`;
+  p.style.marginBottom = (844 * (s-1)) + "px";
+}
+addEventListener("resize", fit);
+
+const q = new URLSearchParams(location.search);
+if(["0","1","2"].includes(q.get("t"))) picked = +q.get("t");
+[...typesBox.children].forEach(x => x.setAttribute("aria-pressed", String(+x.dataset.v === picked)));
+fit();
+run();
+</script>
+
+<script src="bus.js"></script>
+</body>
+</html>

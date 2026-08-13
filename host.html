@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>디알렉티카 — 진행자 화면</title>
+<style>
+  :root{
+    --bg:#101C8C;          /* 참가자·스크린과 같은 짙은 청색 */
+    --line:#4E60D8;        /* 얇은 테두리 */
+    --fg:#FFFFFF;
+    --dim:#8FA0E8;         /* 회색 자리 — 지난 단계 · 곁가지 숫자 */
+    --body:16px;           /* 8.1 — 주인공 숫자 말고는 전부 이 크기 하나 */
+    --hero:64px;           /* 그 단계의 주인공 숫자 하나 */
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg); color:var(--fg);
+    /* 8.1 — 본문은 일반 고딕. 이름 30개와 숫자를 8시간 본다 */
+    font-family:"Apple SD Gothic Neo","Pretendard",-apple-system,sans-serif;
+    font-size:var(--body); line-height:1.5;
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  button{font-family:inherit; font-size:var(--body); cursor:pointer}
+
+  /* ── 헤더 세 칸 ───────────────────────────────── */
+  header{
+    flex:0 0 auto; display:grid; grid-template-columns:1fr auto 1fr;
+    align-items:center; padding:14px 28px; border-bottom:1px solid var(--line);
+  }
+  /* 여기만 픽셀 폰트 — 같은 게임의 도구라는 표시 */
+  .logo{font-family:"Galmuri11",monospace; font-size:22px; letter-spacing:.18em}
+  .title{color:var(--dim); letter-spacing:.06em}
+  .right{text-align:right}
+  /* 테두리만 있는 흐린 버튼 — 8시간 동안 누르는 것은 「다음」 하나뿐 */
+  .ghost{
+    background:transparent; color:var(--dim); border:1px solid var(--line);
+    padding:5px 14px; letter-spacing:.04em;
+  }
+  .ghost:hover{color:var(--fg); border-color:var(--fg)}
+
+  /* ── 브레드크럼 ───────────────────────────────── */
+  .crumb{
+    flex:0 0 auto; display:flex; gap:10px; padding:12px 28px;
+    color:var(--dim); letter-spacing:.06em;
+  }
+  .crumb b{font-weight:400}
+  /* 현재 단계만 흰색 + 밑줄. 지난 단계와 올 단계를 구분하지 않는다 */
+  .crumb .on{color:var(--fg); text-decoration:underline; text-underline-offset:5px}
+
+  /* ── 가운데 ───────────────────────────────────── */
+  main{flex:1 1 auto; display:flex; flex-direction:column; min-height:0; padding:0 28px 8px}
+
+  .topline{
+    flex:0 0 auto; display:grid; grid-template-columns:1fr auto 1fr;
+    align-items:end; padding:10px 0 18px; min-height:86px;
+  }
+  .hero{grid-column:2; text-align:center; letter-spacing:.04em; white-space:nowrap}
+  .hero .n{font-size:var(--hero); line-height:1; margin:0 6px; font-variant-numeric:tabular-nums}
+  .topline .right{grid-column:3}
+
+  /* 검색 — 버튼 자리에 입력칸이 들어선다 */
+  #searchBox{
+    background:transparent; color:var(--fg); border:1px solid var(--fg);
+    padding:5px 12px; width:170px; letter-spacing:.04em; outline:none;
+  }
+  #searchBox::placeholder{color:var(--dim)}
+
+  /* ── 팀 3열 ───────────────────────────────────── */
+  .board{
+    flex:1 1 auto; min-height:0;
+    display:grid; grid-template-columns:repeat(var(--cols,3),minmax(0,1fr)); gap:18px;
+  }
+  .col{border:1px solid var(--line); display:flex; flex-direction:column; min-height:0}
+  .col h2{
+    /* 반전 — 흰 바탕에 짙은 청색 글자 */
+    background:var(--fg); color:var(--bg);
+    font-size:var(--body); font-weight:600; letter-spacing:.02em;
+    text-align:center; padding:7px 6px; line-height:1.2;
+  }
+  /* 열 머리 아래 숫자 — 그 단계에서 세는 것. 입장에서만 곁가지라 회색 */
+  .col .count{
+    color:var(--fg); text-align:center; padding:10px 0 4px;
+    font-variant-numeric:tabular-nums; letter-spacing:.04em;
+  }
+  .col .count.side{color:var(--dim)}
+  .col ul{list-style:none; flex:1 1 auto; min-height:0; overflow-y:auto; padding:6px 0 10px}
+  /* 코드는 이름 바로 옆에 붙습니다 — 열이 넓어 오른쪽 끝에 두면 눈이 멀리 간다 */
+  .col li{
+    display:flex; align-items:baseline; gap:14px;
+    padding:3px 14px; cursor:pointer;
+  }
+  .col li:hover{background:rgba(255,255,255,.07)}
+  .col li .code{color:var(--dim); font-variant-numeric:tabular-nums; letter-spacing:.14em; visibility:hidden}
+  .col li.open .code{visibility:visible}
+  /* 개인별 숫자만 오른쪽 끝 — 세로로 줄이 서야 서로 견줄 수 있다 */
+  .col li .num{margin-left:auto; font-variant-numeric:tabular-nums; letter-spacing:.04em}
+  .col li.miss{opacity:.16}                     /* 검색에 안 걸린 사람 */
+  /* 스크롤 막대 — 판을 시끄럽게 하지 않는다 */
+  .col ul::-webkit-scrollbar{width:6px}
+  .col ul::-webkit-scrollbar-thumb{background:var(--line)}
+
+  /* 8.2~8.4 움직임 — 그 줄만 한 번 밝아졌다 가라앉는다 / 숫자만 한 번 깜빡 */
+  @keyframes rowin{0%{background:rgba(255,255,255,.55)} 100%{background:transparent}}
+  li.new{animation:rowin .3s steps(3,end) 1}
+  @keyframes blink{0%,100%{opacity:1} 50%{opacity:.25}}
+  .tick{animation:blink .2s steps(2,end) 1}
+  /* 8.5 — 전원 완료. 이 단계의 유일한 사건이라 가운데 숫자가 한 번 반전된다 */
+  @keyframes flip{0%,100%{background:transparent; color:var(--fg)}
+                  35%,65%{background:var(--fg); color:var(--bg)}}
+  .hero.done{animation:flip .4s steps(2,end) 1; padding:0 18px}
+
+  /* ── 결과 — 다섯 중 가장 빈 화면 (8.6) ─────────── */
+  .final{
+    flex:1 1 auto; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:26px; letter-spacing:.12em;
+  }
+  /* 결과 화면에는 이름 목록이 없으므로 검색에 걸린 사람만 나타납니다 */
+  .found{display:flex; flex-direction:column; gap:6px; letter-spacing:.04em}
+  .found div{display:flex; gap:14px; justify-content:center}
+  .found .code{color:var(--dim); font-variant-numeric:tabular-nums; letter-spacing:.14em}
+
+  /* ── 「투표 길이」 손잡이 (8.1 · 7.4) ───────────── */
+  .knob{
+    display:flex; gap:8px; align-items:center; justify-content:center;
+    padding-bottom:14px; color:var(--dim); letter-spacing:.04em;
+  }
+  .knob button{
+    background:transparent; color:var(--dim); border:1px solid var(--line);
+    padding:4px 16px; letter-spacing:.04em;
+  }
+  .knob button[aria-pressed="true"]{background:var(--fg); color:var(--bg); border-color:var(--fg)}
+  /* display:flex가 hidden 속성을 이깁니다 — 이 줄이 없으면 손잡이가 끝까지 안 사라집니다 */
+  .knob[hidden]{display:none}
+
+  /* ── 「다음」 — 맨 아래 고정 ───────────────────── */
+  .bottom{
+    flex:0 0 auto; border-top:1px solid var(--line);
+    padding:14px 0; text-align:center;
+  }
+  /* 화면에서 유일하게 채워진 버튼 */
+  #next{
+    background:var(--fg); color:var(--bg); border:0;
+    padding:9px 46px; letter-spacing:.1em; font-weight:600;
+  }
+
+  /* ── 확인 팝업 ───────────────────────────────── */
+  #veil{
+    position:fixed; inset:0; background:rgba(0,0,0,.6);
+    display:none; align-items:center; justify-content:center; z-index:9;
+  }
+  #veil.on{display:flex}
+  .modal{
+    background:var(--bg); border:1px solid var(--fg);
+    padding:32px 40px; min-width:430px; max-width:520px; text-align:center;
+  }
+  .modal .l1{margin-bottom:14px; letter-spacing:.04em}
+  .modal .l2{color:var(--dim); margin-bottom:28px}
+  .modal .l2.warn{color:var(--fg); font-weight:600}   /* 되돌릴 수 없는 것만 굵게 */
+  /* 팀 균형 경고 — 화면에는 없고 이 팝업에만 붙는다 (8.3) */
+  .modal .bal{
+    border-top:1px solid var(--line); margin:-14px 0 26px; padding-top:18px;
+    color:var(--fg); line-height:1.6;
+  }
+  .modal .btns{display:flex; gap:12px; justify-content:center}
+  .modal .go{background:var(--fg); color:var(--bg); border:0; padding:8px 34px; font-weight:600}
+
+  /* ── 목업 전용 조작줄 · 확정되면 통째로 지웁니다 ── */
+  footer{
+    flex:0 0 auto; border-top:1px solid var(--line); padding:8px 28px;
+    display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+    font-size:12px; color:var(--line); letter-spacing:.06em;
+  }
+  footer button{
+    font-size:12px; background:transparent; color:var(--line);
+    border:1px solid var(--line); padding:3px 9px;
+  }
+  footer button[aria-pressed="true"]{background:var(--fg); color:var(--bg); border-color:var(--fg)}
+</style>
+<script src="bus.js"></script>
+</head>
+<body>
+
+<header>
+  <span class="logo">디알렉티카</span>
+  <span class="title">진행자용 화면</span>
+  <span class="right"><button class="ghost" id="screenBtn">스크린</button></span>
+</header>
+
+<nav class="crumb" id="crumb"></nav>
+
+<main>
+  <div class="topline">
+    <div class="hero" id="hero"></div>
+    <div class="right">
+      <button class="ghost" id="searchBtn">이름 검색</button>
+      <input id="searchBox" placeholder="이름" hidden>
+    </div>
+  </div>
+  <div class="board" id="board"></div>
+</main>
+
+<div class="bottom">
+  <div class="knob" id="knob" hidden>
+    <span>투표 길이</span>
+    <button data-k="0.6">짧게</button><button data-k="1" aria-pressed="true">보통</button><button data-k="1.6">길게</button>
+  </div>
+  <button id="next">다음</button>
+</div>
+
+<div id="veil">
+  <div class="modal">
+    <div class="l1" id="mL1"></div>
+    <div class="l2" id="mL2"></div>
+    <div class="bal" id="mBal" hidden></div>
+    <div class="btns">
+      <button class="ghost" id="cancel">취소</button>
+      <button class="go" id="go"></button>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <span>목업 전용 —</span><span id="btns"></span><span id="gauge"></span>
+</footer>
+
+<script>
+/* ── 목업 전용 ────────────────────────────────────────────────
+   서버가 없으므로 참가자가 하는 일을 흉내 냅니다.
+   ⭐ 접속(P1)과 이름 제출(P2) 사이에 시차를 둡니다 — 8.2의
+      「접속 28명인데 열에 24개」가 이 시차에서 나옵니다.
+   ⭐ 사람마다 모을 쌍의 수와 쓸 문장의 수를 미리 정해 두고,
+      RELENTLESS INNOVATORS를 일부러 느리게 굴립니다 —
+      팀 균형 경고(8.3·8.4)가 뜨는 것을 봐야 하기 때문입니다.
+   주소 끝에 ?n=31 을 붙이면 그 인원으로 봅니다.               */
+
+const TYPES = ["CULTURE VANGUARD","CREATIVE RISK-TAKERS","RELENTLESS INNOVATORS"];
+const CAP = 10;                                   /* 5.5 — 한 팀 상한 */
+const BAL = 0.75;      /* 팀 균형 문턱 — 가장 적은 유형이 가장 많은 유형의 이 비율에 못 미치면 경고 */
+
+const SUR = "김이박최정강조윤장임한오서신권황안송전홍유고문양손배백허남심노하곽성차주우구";
+const GIV = ["서연","지훈","수민","유진","하늘","도윤","서아","재현","지우","소율","준혁","예린",
+             "민준","나윤","지호","채원","시우","현우","아름","은성","도현","수빈","가온","루하"];
+const nameAt = k => SUR[k % SUR.length] + GIV[(k*7) % GIV.length];
+const codeAt = k => String(((k+1)*173939) % 900000 + 100000);   /* 6.11 — 개인 코드 6자리 */
+/* 볼 때마다 같은 판이 나오도록 고정된 난수를 씁니다 */
+const rnd = k => { const x = Math.sin(k*12.9898)*43758.5453; return x - Math.floor(x); };
+
+/* people: {name, code, type, idxInType, named, pairs, sentences, goal, writeGoal, voted} */
+let people = [];
+let stage = "entry";                              /* entry · collect · create · vote · result */
+let press = 0;                                    /* 「다음」을 몇 번 눌렀나 */
+let voteLen = 1;                                  /* 투표 길이 손잡이 — 짧게 0.6 · 보통 1 · 길게 1.6 */
+let voteStarted = false;
+let timers = [];
+const clearAll = () => { timers.forEach(clearTimeout); timers = []; };
+const later = (fn,ms) => timers.push(setTimeout(fn,ms));
+
+/* ── 「다음」 여섯 번과 「종료」 한 번 (8.1) ─────────────────── */
+const PRESSES = [
+  {at:"entry",   l1:"수집을 시작합니다", l2:"참가자 전원이 포스터 코드 입력 화면으로 넘어갑니다.",
+                 go:"시작", act(){ stage = "collect"; runCollect(); }},
+  {at:"collect", l1:"수집을 종료합니다", l2:"입력 중인 참가자도 그 자리에서 대기 화면으로 넘어갑니다.",
+                 go:"종료", warn:true, bal:"수집", act(){ clearAll(); stage = "create"; }},
+  {at:"create",  l1:"창작을 시작합니다", l2:"참가자 전원이 문장 창작 화면으로 넘어갑니다.",
+                 go:"시작", act(){ runCreate(); }},
+  {at:"create",  l1:"창작을 종료합니다", l2:"쓰는 중인 문장은 제출되지 않습니다.",
+                 go:"종료", warn:true, bal:"문장", act(){ clearAll(); stage = "vote"; }},
+  {at:"vote",    l1:"투표를 시작합니다", l2:"참가자 전원이 투표 화면으로 넘어갑니다.",
+                 go:"시작", act(){ runVote(); }},
+  /* ⭐ 6번이 투표 종료와 결과 발표를 함께 합니다 */
+  {at:"vote",    l1:"투표를 종료하고 결과를 발표합니다",
+                 l2:"아직 투표 중인 참가자가 있으면 그대로 끊깁니다. 스크린과 참가자 화면에 결과가 함께 뜹니다.",
+                 go:"발표", warn:true, act(){ clearAll(); stage = "result"; }},
+  {at:"result",  l1:"워크숍을 종료합니다", l2:"",
+                 go:"종료", act(){ note("워크숍 종료"); }},
+];
+
+/* 5.5 — 어떤 유형이 10명을 넘으면 그 유형만 1·2로 갈린다.
+         가르는 기준은 그 유형에 들어온 순서로 번갈아 */
+function layout(){
+  const cols = [];
+  TYPES.forEach(t => {
+    const mine = people.filter(p => p.type === t);
+    if(mine.length > CAP){
+      cols.push({type:t, label:t+" 1", members:mine.filter(p => p.idxInType % 2 === 0)});
+      cols.push({type:t, label:t+" 2", members:mine.filter(p => p.idxInType % 2 === 1)});
+    }else{
+      cols.push({type:t, label:t, members:mine});
+    }
+  });
+  return cols;
+}
+
+/* 그 단계에서 세는 것 — 열 머리 아래 숫자와 이름 옆 숫자가 같은 것을 셉니다 */
+const teamNum = c =>
+  stage === "entry"   ? c.members.length
+: stage === "collect" ? c.members.reduce((s,p) => s + p.pairs, 0)
+: stage === "create"  ? c.members.reduce((s,p) => s + p.sentences, 0)
+                      : `${c.members.filter(p => p.voted).length} / ${c.members.length}`;
+
+const personNum = p =>
+  stage === "entry"   ? ""
+: stage === "collect" ? String(p.pairs)
+: stage === "create"  ? `${p.sentences} / ${p.pairs}`  /* 8.4 — 0/0을 가리려고 둘을 붙여 씁니다 */
+                      : (p.voted ? "완료" : "");       /* 8.5 — 아직인 사람은 비워 둔다 */
+
+const board = document.getElementById("board");
+const hero  = document.getElementById("hero");
+
+const ORDER = ["entry","collect","create","vote","result"];
+
+function drawCrumb(){
+  const names = ["입장","수집","창작","투표","결과"];
+  const now = ORDER.indexOf(stage);
+  document.getElementById("crumb").innerHTML = names
+    .map((n,i) => `<b class="${i === now ? "on" : ""}">${n}</b>`).join("<span>›</span>");
+}
+
+function drawHero(){
+  /* 8.3 — 수집·창작에는 주인공 숫자가 없습니다. 억지로 만들지 않습니다 */
+  hero.className = "hero";
+  hero.innerHTML =
+    stage === "entry" ? `접속<span class="n" id="heroN">${people.length}</span>명`
+  : stage === "vote"  ? `투표 완료<span class="n" id="heroN">${voteDone()} / ${people.length}</span>`
+                      : "";
+}
+
+const voteDone = () => people.filter(p => p.voted).length;
+
+function draw(){
+  /* 8.6 — 결과는 다섯 중 가장 빈 화면입니다. 팀 3열도 숫자도 이름 목록도 없습니다 */
+  if(stage === "result"){
+    document.documentElement.style.setProperty("--cols", 1);   /* 열이 없으므로 판을 한 칸으로 */
+    board.innerHTML = `<div class="final">스크린에서 결과를 확인하세요<div class="found" id="found"></div></div>`;
+  }else{
+    const cols = layout();
+    document.documentElement.style.setProperty("--cols", cols.length);
+    board.innerHTML = cols.map((c,i) => `
+      <section class="col">
+        <h2>${c.label}</h2>
+        <div class="count${stage === "entry" ? " side" : ""}" id="cnt${i}">${teamNum(c)}</div>
+        <ul id="ul${i}"></ul>
+      </section>`).join("");
+    cols.forEach((c,i) => {
+      const ul = document.getElementById("ul"+i);
+      /* 8.2 — 이름을 낸 사람만 열에 나타난다 */
+      c.members.filter(p => p.named).forEach(p => ul.appendChild(row(p)));
+    });
+  }
+  /* 손잡이는 투표가 아직 시작되지 않았을 때만 「다음」 위에 앉습니다 (8.1 · 7.4) */
+  document.getElementById("knob").hidden = !(stage === "vote" && !voteStarted);
+  document.getElementById("next").textContent = stage === "result" ? "종료" : "다음";
+  drawCrumb(); drawHero(); applySearch(); gauge();
+}
+
+function row(p){
+  const li = document.createElement("li");
+  li.dataset.name = p.name; li.dataset.code = p.code;
+  li.innerHTML = `<span>${p.name}</span><span class="code">${p.code}</span>`
+               + `<span class="num">${personNum(p)}</span>`;
+  /* 이름 클릭 → 개인 코드 6자리가 펼쳐진다 (8.1 · 6.11) */
+  li.onclick = () => li.classList.toggle("open");
+  return li;
+}
+
+/* 그 사람의 줄과 그 팀의 숫자만 고쳐 그립니다 — 판을 다시 그리면 스크롤이 튑니다 */
+function bump(p){
+  const cols = layout();
+  const ci = cols.findIndex(c => c.members.includes(p));
+  const li = document.querySelector(`#ul${ci} li[data-code="${p.code}"]`);
+  if(li){
+    li.querySelector(".num").textContent = personNum(p);
+    li.classList.remove("new"); void li.offsetWidth; li.classList.add("new");
+  }
+  const cnt = document.getElementById("cnt"+ci);
+  if(cnt){
+    cnt.textContent = teamNum(cols[ci]);
+    cnt.classList.remove("tick"); void cnt.offsetWidth; cnt.classList.add("tick");
+  }
+  if(stage === "vote"){
+    const h = document.getElementById("heroN");
+    if(h){
+      h.textContent = `${voteDone()} / ${people.length}`;
+      h.classList.remove("tick"); void h.offsetWidth; h.classList.add("tick");
+    }
+    /* 8.5 움직임 3 — 전원 완료. 이 단계의 유일한 사건 */
+    if(voteDone() === people.length){
+      hero.classList.remove("done"); void hero.offsetWidth; hero.classList.add("done");
+    }
+  }
+  gauge();
+}
+
+/* ── 입장 — 한 사람이 들어옴 ───────────────────────────────
+   ① 접속 숫자가 오른다 ② 잠시 뒤 이름이 열에 붙는다        */
+function arrive(i){
+  const type = TYPES[i % 3];                      /* 6.1 — 접속 순서대로 균등 배정 */
+  const slow = i % 3 === 2;                       /* 목업 — 셋째 유형을 느리게 굴립니다 */
+  const goal = i === 5 ? 0                        /* 한 명은 한 쌍도 못 모읍니다 (0/0) */
+             : slow ? 2 + Math.floor(rnd(i)*3)    /* 2~4 */
+                    : 3 + Math.floor(rnd(i)*5);   /* 3~7 */
+  const p = {name:nameAt(i), code:codeAt(i), type,
+             idxInType:people.filter(q => q.type === type).length,
+             named:false, pairs:0, sentences:0, goal,
+             /* 한 명은 쌍이 있는데 한 편도 안 씁니다 (0/4) */
+             writeGoal: i === 2 ? 0 : Math.max(1, Math.round(goal * (0.5 + rnd(i+100)*0.5)))};
+  people.push(p);
+
+  const h = document.getElementById("heroN");
+  if(h){ h.textContent = people.length;
+         h.classList.remove("tick"); void h.offsetWidth; h.classList.add("tick"); }
+
+  const before = layout().length;
+  later(() => {
+    p.named = true;
+    if(layout().length !== before) return draw();  /* 열이 갈리면 판을 다시 그린다 */
+    const cols = layout();
+    const ci = cols.findIndex(c => c.members.includes(p));
+    const ul = document.getElementById("ul"+ci);
+    if(!ul) return draw();
+    const li = row(p); li.classList.add("new");
+    ul.appendChild(li); ul.scrollTop = ul.scrollHeight;
+    const cnt = document.getElementById("cnt"+ci);
+    cnt.textContent = teamNum(cols[ci]);
+    cnt.classList.remove("tick"); void cnt.offsetWidth; cnt.classList.add("tick");
+    applySearch(); gauge();
+  }, 900 + Math.random()*2600);
+}
+
+/* ── 수집 · 창작 — 사람마다 제 속도로 하나씩 올립니다 ────── */
+function runCollect(){
+  draw();
+  people.forEach((p,i) => {
+    const slow = p.type === TYPES[2];
+    (function one(){
+      if(p.pairs >= p.goal) return;
+      later(() => { p.pairs++; bump(p); one(); },
+            (slow ? 2200 : 1300) + Math.random()*1800);
+    })();
+  });
+}
+
+function runCreate(){
+  people.forEach(p => {
+    (function one(){
+      if(p.sentences >= Math.min(p.writeGoal, p.pairs)) return;
+      later(() => { p.sentences++; bump(p); one(); }, 1500 + Math.random()*2600);
+    })();
+  });
+}
+
+/* 8.5 — 투표는 문장이 소진되면 저절로 끝납니다. 사람마다 끝나는 때가 다릅니다.
+   손잡이(짧게·보통·길게)가 그 길이를 늘리고 줄입니다 */
+function runVote(){
+  voteStarted = true;
+  people.forEach(p => later(() => { p.voted = true; bump(p); },
+                            (3000 + Math.random()*13000) * voteLen));
+}
+
+/* ── 팀 균형 (8.3) ────────────────────────────────────────
+   ⭐ 열이 아니라 유형으로 잽니다. 10명을 넘어 1·2로 갈린 열은
+      인원이 반이라 개수도 반이라, 열끼리 견주면 늘 경고가 뜹니다. */
+function balance(){
+  const sum = TYPES.map(t => people.filter(p => p.type === t)
+    .reduce((s,p) => s + (stage === "collect" ? p.pairs : p.sentences), 0));
+  const hi = Math.max(...sum), lo = Math.min(...sum);
+  if(hi === 0 || lo >= hi*BAL) return null;
+  return TYPES[sum.indexOf(lo)];
+}
+
+/* ── 확인 팝업 ───────────────────────────────────────────── */
+const veil = document.getElementById("veil");
+document.getElementById("next").onclick = () => {
+  const P = PRESSES[press];
+  if(!P) return;
+  document.getElementById("mL1").textContent = P.l1;
+  const l2 = document.getElementById("mL2");
+  l2.textContent = P.l2;
+  l2.hidden = !P.l2;                              /* 종료 팝업은 둘째 줄이 없습니다 */
+  l2.classList.toggle("warn", !!P.warn);          /* 되돌릴 수 없는 것만 굵게 */
+  document.getElementById("go").textContent = P.go;
+  const bal = document.getElementById("mBal");
+  const late = P.bal && balance();
+  bal.hidden = !late;
+  if(late) bal.innerHTML = `${late}의 ${P.bal}이 적습니다.<br>이후 활동에 영향을 줄 수 있습니다.`;
+  veil.classList.add("on");
+};
+document.getElementById("cancel").onclick = close;
+veil.onclick = e => { if(e.target === veil) close(); };
+addEventListener("keydown", e => { if(e.key === "Escape") close(); });
+function close(){ veil.classList.remove("on"); }
+document.getElementById("go").onclick = () => {
+  close();
+  const P = PRESSES[press++];
+  P.act(); draw();
+  Bus.set(press);                                 /* 스크린과 참가자 폰이 같은 신호로 따라온다 (8.1) */
+};
+/* 스크린 버튼 — 새 창으로 ③ 공용 대형 화면을 연다 (8.1)
+   사고 복구용이라 처음이 아니라 **지금 단계**의 화면으로 연다 */
+document.getElementById("screenBtn").onclick = () =>
+  open(Bus.screenAt(press),"dialectica-screen");
+
+/* ── 이름 검색 — 안 걸린 이름을 흐리게 한다 ─────────────────
+   지우지 않고 흐리게 두는 이유: 그 사람이 어느 팀 열에 있는지가
+   같이 읽혀야 「가서 말해 준다」로 이어집니다.                */
+const searchBtn = document.getElementById("searchBtn");
+const searchBox = document.getElementById("searchBox");
+searchBtn.onclick = () => { searchBtn.hidden = true; searchBox.hidden = false; searchBox.focus(); };
+searchBox.oninput = applySearch;
+searchBox.onkeydown = e => { if(e.key === "Escape") closeSearch(); };
+searchBox.onblur = () => { if(!searchBox.value) closeSearch(); };
+function closeSearch(){
+  searchBox.value = ""; searchBox.hidden = true; searchBtn.hidden = false; applySearch();
+}
+function applySearch(){
+  const q = searchBox.hidden ? "" : searchBox.value.trim();
+  document.querySelectorAll(".col li").forEach(li =>
+    li.classList.toggle("miss", !!q && !li.dataset.name.includes(q)));
+  /* 결과 화면에는 목록이 없으므로 걸린 사람만 나타납니다 —
+     재접속은 언제 터질지 모르는 사고라 마지막 단계에도 검색을 남깁니다 (8.1) */
+  const found = document.getElementById("found");
+  if(found) found.innerHTML = !q ? "" : people.filter(p => p.name.includes(q)).slice(0,8)
+    .map(p => `<div><span>${p.name}</span><span class="code">${p.code}</span></div>`).join("");
+}
+
+/* 「투표 길이」 손잡이 — 평소엔 안 건드리고 그냥 「다음」을 누릅니다 (7.4) */
+document.querySelectorAll("#knob button").forEach(b => b.onclick = () => {
+  voteLen = +b.dataset.k;
+  document.querySelectorAll("#knob button").forEach(o =>
+    o.setAttribute("aria-pressed", String(o === b)));
+  gauge();
+});
+
+/* ── 목업 전용 조작줄 ─────────────────────────────────────── */
+let noted = "";
+const note = s => { noted = s; gauge(); };
+function gauge(){
+  const label = {entry:"입장", collect:"수집", create:"창작", vote:"투표", result:"결과"}[stage];
+  const byType = () => TYPES.map(t => people.filter(p => p.type === t)
+    .reduce((s,p) => s + (stage === "collect" ? p.pairs : p.sentences), 0)).join("·");
+  const tail =
+    stage === "entry"  ? ` · 열에 뜬 이름 ${people.filter(p => p.named).length}개`
+  : stage === "vote"   ? ` · 완료 ${voteDone()}명 · 길이 ${{0.6:"짧게",1:"보통",1.6:"길게"}[voteLen]}`
+  : stage === "result" ? ""
+                       : ` · 유형별 ${byType()}`;
+  document.getElementById("gauge").textContent =
+    `${innerWidth}×${innerHeight} · ${label} · 접속 ${people.length}명 · ${layout().length}팀`
+    + tail + (noted ? ` · ${noted}` : "");
+}
+
+function run(target){
+  clearAll(); people = []; stage = "entry"; press = 0; noted = ""; voteStarted = false; draw();
+  Bus.set(0);                                     /* 인원 프리셋을 다시 누르면 창 셋이 함께 처음으로 */
+  document.querySelectorAll("#btns button").forEach(b =>
+    b.setAttribute("aria-pressed", String(+b.dataset.n === target)));
+  let i = 0;
+  (function step(){
+    if(i >= target) return;
+    arrive(i++);
+    later(step, 120 + Math.random()*260);
+  })();
+}
+
+const PRESETS = [{n:0,why:"시작 전"},{n:12,why:"들어오는 중"},{n:28,why:"3팀"},
+                 {n:30,why:"3팀 꽉"},{n:31,why:"4팀"}];
+const btns = document.getElementById("btns");
+PRESETS.forEach(p => {
+  const b = document.createElement("button");
+  b.textContent = `${p.n}명 · ${p.why}`; b.dataset.n = p.n;
+  b.onclick = () => run(p.n);
+  btns.appendChild(b);
+});
+addEventListener("resize", gauge);
+const startN = parseInt(new URLSearchParams(location.search).get("n"));
+run(isNaN(startN) ? 28 : Math.min(60, startN));
+</script>
+
+</body>
+</html>

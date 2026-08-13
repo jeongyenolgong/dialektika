@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>디알렉티카 — 스크린 9.1 입장</title>
+<style>
+  :root{
+    --bg:#101C8C;          /* 기아 제안서 --bg */
+    --bg-2:#0A1266;        /* 제안서 --bg-2 (더 짙은 쪽) */
+    --line:#4E60D8;        /* 제안서 --line */
+    --name:#FFFFFF;
+    --nameSize:2.6vw;
+    --cols:3;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg);
+    color:var(--name);
+    font-family:"Galmuri11","Apple SD Gothic Neo",monospace;
+    display:flex; flex-direction:column;
+    padding:3vh 4vw;
+    overflow:hidden;
+  }
+
+  /* 위 — 게임 이름 (원어 병기 · 시안) */
+  header{
+    text-align:center;
+    padding-bottom:2vh;
+    border-bottom:1px solid var(--line);
+    flex:0 0 auto;
+  }
+  header .ko{font-size:clamp(18px,2.2vw,34px); letter-spacing:.35em; color:var(--name)}
+  header .la{font-size:clamp(18px,2.2vw,34px); letter-spacing:.35em; color:var(--line); margin-left:1.2em}
+
+  main{
+    flex:1 1 auto;
+    display:grid;
+    grid-template-columns:repeat(var(--cols),minmax(0,1fr));
+    gap:1.6vw;
+    padding:5vh 0;
+    min-height:0;
+  }
+  .col{border:1px solid var(--line); display:flex; flex-direction:column; min-height:0}
+
+  h2{
+    /* 반전 — 흰 바탕에 짙은 청색 글자 */
+    background:var(--name); color:var(--bg);
+    letter-spacing:.02em; font-weight:400; line-height:1.15;
+    text-align:center; padding:.9vh .3vw;
+    /* 흰 블록 높이를 두 줄로 통일하고 글자는 세로 가운데 */
+    min-height:calc(2 * 1.15 * var(--nameSize) + 1.8vh);
+    display:flex; align-items:center; justify-content:center;
+    overflow:hidden;
+  }
+
+  ul{
+    list-style:none; padding:2.2vh .6vw; text-align:center;
+    flex:1 1 auto; min-height:0; overflow:hidden;
+    column-count:var(--inCols,1); column-gap:.6vw;
+  }
+  li{
+    font-size:var(--nameSize); color:var(--name); line-height:1.1;
+    white-space:nowrap; margin-bottom:1.2vh; break-inside:avoid;
+  }
+
+  @keyframes flash{
+    0%{opacity:0}
+    50%{opacity:1; filter:brightness(2.2)}
+    100%{opacity:1; filter:brightness(1)}
+  }
+  li.new{animation:flash .3s steps(3,end) 1}
+
+  /* ── 목업 전용 조작줄 · 확정되면 통째로 지웁니다 ── */
+  footer{
+    flex:0 0 auto; border-top:1px solid var(--line); padding-top:1.6vh;
+    display:flex; align-items:center; justify-content:center; gap:1.4vw;
+    font-size:12px; color:var(--line); letter-spacing:.08em;
+  }
+  footer button{
+    font-family:inherit; font-size:12px; letter-spacing:.08em;
+    background:transparent; color:var(--line);
+    border:1px solid var(--line); padding:.5vh .8vw; cursor:pointer;
+  }
+  footer button[aria-pressed="true"]{background:var(--name); color:var(--bg); border-color:var(--name)}
+  #gauge{opacity:.85}
+</style>
+</head>
+<body>
+
+<header><span class="ko">디알렉티카</span><span class="la">DIALECTICA</span></header>
+<main id="board"></main>
+
+<footer>
+  <span>목업 전용 —</span>
+  <span id="btns"></span>
+  <span id="gauge"></span>
+</footer>
+
+<script>
+/* ── 목업 전용 ─────────────────────────────────────────────────
+   서버가 없으므로 참가자가 들어오는 것을 흉내 냅니다.
+   버튼으로 팀 수를 갈아 끼웁니다. 인원은 팀 수 × 10(상한)으로 채웁니다.
+   주소 끝에 ?n=37 을 붙이면 그 인원으로 봅니다.                 */
+
+const TYPES = ["CULTURE VANGUARD","CREATIVE RISK-TAKERS","RELENTLESS INNOVATORS"];
+const CAP = 10;                              /* 5.5 — 한 팀 상한 */
+
+const SUR = "김이박최정강조윤장임한오서신권황안송전홍유고문양손배백허남심노하곽성차주우구";
+const GIV = ["서연","지훈","수민","유진","하늘","도윤","서아","재현","지우","소율","준혁","예린",
+             "민준","나윤","지호","채원","시우","현우","아름","은성","도현","수빈","가온","루하"];
+const nameAt = k => SUR[k % SUR.length] + GIV[(k*7) % GIV.length];
+
+let timer = null;
+let BASE = 2.6;
+
+let people = [];   /* {name, type, idxInType} — 접속 순서 그대로 */
+
+/* 지금 인원으로 팀을 계산합니다.
+   5.5 — 어떤 유형이 10명을 넘으면 그 유형만 1·2로 갈립니다.
+         가르는 기준은 그 유형에 들어온 순서로 번갈아.
+         그래서 한 번 정해진 번호는 뒤에 사람이 더 와도 바뀌지 않습니다. */
+function layout(){
+  const cols = [];
+  TYPES.forEach(t => {
+    const mine = people.filter(p => p.type === t);
+    if(mine.length > CAP){
+      cols.push({label:t+" 1", members:mine.filter(p => p.idxInType % 2 === 0)});
+      cols.push({label:t+" 2", members:mine.filter(p => p.idxInType % 2 === 1)});
+    }else{
+      cols.push({label:t, members:mine});
+    }
+  });
+  return cols;
+}
+
+function draw(newest){
+  const cols = layout();
+  document.documentElement.style.setProperty("--cols", cols.length);
+  const sizes = {3:2.6, 4:2.3, 5:2.1, 6:2.0};
+  BASE = sizes[cols.length] || 2.0;
+  document.documentElement.style.setProperty("--inCols", 1);
+  document.documentElement.style.setProperty("--nameSize", BASE + "vw");
+
+  const board = document.getElementById("board");
+  board.innerHTML = "";
+  cols.forEach((c,i) => {
+    const sec = document.createElement("section");
+    sec.className = "col";
+    sec.innerHTML = `<h2>${c.label}</h2><ul id="c${i}">`
+      + c.members.map(m => `<li${m.name === newest ? ' class="new"' : ""}>${m.name}</li>`).join("")
+      + `</ul>`;
+    board.appendChild(sec);
+  });
+  fitNames(BASE); fitHeaders(); gauge();
+}
+
+function render(target){
+  clearTimeout(timer);
+  people = [];
+  draw(null);
+  document.querySelectorAll("#btns button").forEach(b =>
+    b.setAttribute("aria-pressed", String(+b.dataset.n === target)));
+
+  let i = 0;
+  (function arrive(){
+    if(i >= target) return;
+    const type = TYPES[i % 3];               /* 6.1 — 서버가 접속 순서대로 균등 배정 */
+    const idxInType = people.filter(p => p.type === type).length;
+    const nm = nameAt(i);
+    people.push({name:nm, type, idxInType});
+    i++;
+    draw(nm);
+    timer = setTimeout(arrive, 90 + Math.random()*160);
+  })();
+}
+
+/* 열 머리는 이름 크기에서 시작해, 두 줄 안에 들어갈 때까지만 줄입니다 */
+function fitHeaders(){
+  const start = parseFloat(getComputedStyle(document.documentElement)
+                  .getPropertyValue("--nameSize"));
+  document.querySelectorAll("h2").forEach(h => {
+    let s = start;
+    h.style.fontSize = s + "vw";
+    let guard = 0;
+    while((h.scrollHeight > h.clientHeight + 1 || h.scrollWidth > h.clientWidth + 1)
+          && s > 0.6 && guard++ < 60){
+      s -= 0.05;
+      h.style.fontSize = s + "vw";
+    }
+  });
+  equalizeHeads();
+}
+
+/* 이름이 박스를 넘지 않게 맞춥니다.
+   ① 한 줄 세로로 넣어 본다 → ② 넘치면 박스 안에서 두 칸으로 나눈다
+   → ③ 그래도 넘치면 두 칸을 유지한 채 글자를 줄인다.
+   세 열이 서로 다르게 보이지 않도록 모든 박스에 같은 값을 씁니다. */
+function fitNames(base){
+  const uls = [...document.querySelectorAll("ul")];
+  if(!uls.length) return;
+  const root = document.documentElement;
+  const most = Math.max(...uls.map(u => u.children.length));
+  if(!most) return;
+
+  const set = (inCols,size) => {
+    root.style.setProperty("--inCols", inCols);
+    root.style.setProperty("--nameSize", size + "vw");
+  };
+
+  /* 한 칸에 몇 줄이 들어가는지 직접 잽니다.
+     다단에서는 넘치는 줄이 옆 칸으로 흘러가 높이로는 넘침을 못 잡습니다. */
+  const perCol = () => {
+    const ul = uls[0];
+    const cs = getComputedStyle(ul);
+    const avail = ul.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    const li = ul.querySelector("li");
+    if(!li) return 99;
+    const ls = getComputedStyle(li);
+    const row = li.offsetHeight + parseFloat(ls.marginBottom || 0);
+    return Math.max(1, Math.floor((avail + parseFloat(ls.marginBottom || 0)) / row));
+  };
+
+  set(1, base); if(most <= perCol()) return;   /* ① 한 칸 */
+  set(2, base); if(most <= perCol()*2) return; /* ② 박스 안에서 두 칸 */
+  let s = base;                                 /* ③ 두 칸을 유지한 채 글자를 줄인다 */
+  while(s > 0.7){
+    s -= 0.05; set(2, s);
+    if(most <= perCol()*2) return;
+  }
+}
+
+/* 흰 블록 높이를 가장 높은 것에 맞춥니다 — 열마다 이름 시작 높이가 같아야 합니다 */
+function equalizeHeads(){
+  const hs = [...document.querySelectorAll("h2")];
+  if(!hs.length) return;
+  hs.forEach(h => h.style.height = "auto");
+  const tallest = Math.max(...hs.map(h => h.offsetHeight));
+  hs.forEach(h => h.style.height = tallest + "px");
+}
+
+function gauge(){
+  const ul = document.getElementById("c0");
+  if(!ul) return;
+  const root = getComputedStyle(document.documentElement);
+  const inCols = root.getPropertyValue("--inCols").trim() || "1";
+  const teams = document.querySelectorAll(".col").length;
+  const most = Math.max(0, ...[...document.querySelectorAll("ul")].map(u => u.children.length));
+  document.getElementById("gauge").textContent =
+    `${innerWidth}×${innerHeight} · 접속 ${people.length}명 · ${teams}팀 · 한 팀 최대 ${most}명 · `
+    + `박스 안 ${inCols}칸 · 이름 ${getComputedStyle(ul.querySelector("li") || ul).fontSize} · `
+    + `열 머리 ${getComputedStyle(document.querySelector("h2")).fontSize}`;
+}
+
+/* 버튼 */
+/* 인원 프리셋 — 팀이 몇으로 갈리는지는 인원이 정합니다 */
+const PRESETS = [
+  {n:30, why:"3팀"}, {n:31, why:"4팀"}, {n:32, why:"5팀"},
+  {n:33, why:"6팀"}, {n:60, why:"6팀 꽉"}
+];
+const btns = document.getElementById("btns");
+PRESETS.forEach(p => {
+  const b = document.createElement("button");
+  b.textContent = `${p.n}명 · ${p.why}`; b.dataset.n = p.n;
+  b.onclick = () => render(p.n);
+  btns.appendChild(b);
+});
+
+addEventListener("resize", () => { fitNames(BASE); fitHeaders(); gauge(); });
+const startN = parseInt(new URLSearchParams(location.search).get("n"));
+render(startN > 0 ? Math.min(60, startN) : 33);
+</script>
+
+<script src="bus.js"></script>
+</body>
+</html>

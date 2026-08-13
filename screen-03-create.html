@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>디알렉티카 — 스크린 9.3 창작</title>
+<style>
+  :root{
+    --bg:#101C8C; --bg-2:#0A1266; --line:#4E60D8; --name:#FFFFFF;
+    /* 5.2 유형 3색 — 엠블럼에만 씁니다 */
+    --t0:#FFC83D;  /* CULTURE VANGUARD */
+    --t1:#FF7A8A;  /* CREATIVE RISK-TAKERS */
+    --t2:#5FE6B0;  /* RELENTLESS INNOVATORS */
+
+    --gap:0vw;        /* 세 덩어리 사이 여백 */
+    --glyph:2.6vw;    /* 플랩 한 칸의 글자 */
+    --rank:1.6vw;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg); color:var(--name);
+    font-family:"Galmuri11","Apple SD Gothic Neo",monospace;
+    display:flex; flex-direction:column; padding:3vh 4vw; overflow:hidden;
+  }
+
+  header{text-align:center; padding-bottom:2vh; border-bottom:1px solid var(--line); flex:0 0 auto}
+  header .ko{font-size:var(--title,36px); letter-spacing:.35em}
+  header .la{font-size:var(--title,36px); letter-spacing:.35em; color:var(--line); margin-left:1.2em}
+
+  /* ── 단계 제목 — 지금이 무슨 시간인지 ────────────────────────────
+     게임 이름과 같은 방식으로 원어를 병기합니다(9.0) — 한글과 같은 크기,
+     원어는 선 색으로 한 단계 눕힘. 화면에서 가장 큰 글자입니다.        */
+  .stage{
+    flex:0 0 auto; text-align:center; padding-top:3.4vh; font-weight:400;
+  }
+  .stage .ko{font-size:var(--stage,48px); letter-spacing:.12em}
+  .stage .la{font-size:var(--stage,48px); letter-spacing:.12em; color:var(--line); margin-left:1em}
+
+  main{
+    flex:1 1 auto; display:grid; grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:var(--gap); padding:4vh 0; min-height:0;
+    /* 세로로는 판 전체를 가운데. 세 덩어리의 1위 줄은 서로 같은 높이에 섭니다
+       — 팀이 여섯이면 팀 칸만 아래로 길어집니다 (미결 ⑤) */
+    align-content:center; align-items:start;
+  }
+  section{display:flex; flex-direction:column; min-height:0; align-items:center}
+  h2{
+    font-size:var(--sub,24px); font-weight:400; letter-spacing:.06em;
+    color:var(--line); text-align:center; padding-bottom:4vh; flex:0 0 auto;
+  }
+  ol{list-style:none; display:flex; flex-direction:column; gap:2.6vh}
+  li{display:flex; align-items:center; gap:.8vw; line-height:1}
+
+  .rank{color:var(--line); font-size:var(--rank); width:1.2em; flex:0 0 auto; text-align:right}
+  .field{display:flex; flex:0 0 auto}
+
+  /* ── 스플릿 플랩 한 칸 ─────────────────────────────────────────
+     글자가 한 장씩 접혀 내려옵니다.
+     5.3 — 부드럽게 미끄러지지 않고 두 상태로 뚝 끊깁니다(steps 2).
+     ⛔ 칸 가운데를 가르는 이음매는 두지 않습니다 — 글자가 읽기 어려워집니다
+        (2026.08.12 사용자: "칸마다 이음매가 없는 게 좋아. 가독성이 떨어져")     */
+  .cell{
+    position:relative; display:inline-block;
+    width:1em; height:1.16em; font-size:var(--glyph);
+    text-align:center; overflow:hidden;
+    transform-origin:50% 0; will-change:transform;
+  }
+  .cell.narrow{width:.5em}            /* 숫자·라틴 칸 — Galmuri11 반각 */
+  .tname .cell{font-size:var(--tname,24px)}    /* 팀 이름 — 칸에 들어갈 때까지 줄입니다 */
+
+  /* 팀 번호 — 6.1 확정: 엠블럼 오른쪽에 Galmuri11 숫자로, 아래를 맞춰 붙입니다.
+     도트로 그리지 않습니다 — 엠블럼 상자가 11×11을 벗어나면
+     번호가 없는 상태(팀 셋)와 있는 상태에서 정렬이 흔들립니다 */
+  .emwrap{display:inline-flex; align-items:flex-end; gap:.15em; flex:0 0 auto}
+  .emnum{color:var(--tc,var(--name)); line-height:1}
+
+  /* 엠블럼 — 6.1: 확대는 정수배만. 스크린 순위는 ×3 = 33px */
+  .em{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:var(--em,33px); height:var(--em,33px); flex:0 0 auto;
+    transform-origin:50% 0; will-change:transform;
+  }
+  .em svg{width:100%; height:100%; display:block}
+
+  /* ── 목업 전용 조작줄 · 확정되면 통째로 지웁니다 ── */
+  footer{
+    flex:0 0 auto; border-top:1px solid var(--line); margin-top:2vh; padding-top:1.2vh;
+    display:flex; flex-direction:column; align-items:center; gap:.5vh;
+    font-size:12px; color:var(--line); letter-spacing:.06em;
+  }
+  footer .help{color:var(--line); opacity:.9; margin-bottom:.3vh}
+  footer .help b{color:var(--name); font-weight:400}
+  footer .row{display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:.5vw}
+  footer .lbl{opacity:.9}
+  footer button{
+    font-family:inherit; font-size:12px; letter-spacing:.06em;
+    background:transparent; color:var(--line); border:1px solid var(--line);
+    padding:.4vh .6vw; cursor:pointer;
+  }
+  footer button[aria-pressed="true"]{background:var(--name); color:var(--bg); border-color:var(--name)}
+  footer .grp{display:inline-flex; align-items:center; gap:.3vw; margin:0 .8vw}
+  footer .val{color:var(--name); min-width:4.6em; display:inline-block; text-align:center}
+  #gauge{text-align:center; opacity:.8; margin-top:.4vh}
+</style>
+</head>
+<body>
+
+<header><span class="ko">디알렉티카</span><span class="la">DIALECTICA</span></header>
+
+<h1 class="stage"><span class="ko">문장 창작</span><span class="la">SENTENCE CREATION</span></h1>
+
+<main>
+  <section><h2>단어 순위</h2><ol id="w"></ol></section>
+  <section><h2>개인 순위</h2><ol id="p"></ol></section>
+  <section><h2>팀 순위</h2><ol id="t"></ol></section>
+</main>
+
+<footer>
+  <p class="help">아래 줄은 <b>목업에만 있는 조작줄</b>입니다. 실제 화면에는 없고, 값이 정해지면 통째로 지웁니다.</p>
+
+  <div class="row">
+    <span id="btns"></span>
+    <button id="force">지금 한 번 갈아 보기</button>
+  </div>
+
+  <p id="gauge"></p>
+</footer>
+
+<script>
+/* ── 목업 전용 ────────────────────────────────────────────────
+   서버가 없으므로 문장이 쌓이는 것을 흉내 냅니다.
+
+   ⭐ 9.3은 9.2(수집)와 같은 판입니다. 세는 것만 바뀝니다.
+      단어 순위 — 그 단어로 「문장이 만들어진 횟수」 (수집 때는 쌍을 완성한 사람 수)
+      개인 순위 — 「개인이 쓴 문장 수」        (수집 때는 수집 개수)
+      팀 순위  — 「팀원 평균 문장 수」         (수집 때는 평균 수집 개수)
+
+   제목도 움직임도 수치도 그대로입니다. 고친 곳은 세는 대상뿐입니다.        */
+
+const TYPES = ["CULTURE VANGUARD","CREATIVE RISK-TAKERS","RELENTLESS INNOVATORS"];
+const CAP = 10;                                  /* 5.5 — 한 팀 상한 */
+
+/* 돌려 보며 정할 값 */
+let MS = 20;        /* 판때기 한 장이 넘어가는 길이 — 확정 (2026.08.12 사용자 "지금처럼 빠르게 가자") */
+let K  = 10;        /* 멈추기 전에 훑는 장수 — 제안값. 20ms에서 접히는 모습이 안 그려지므로
+                       판때기 느낌을 남기는 것은 「훑는 길이」뿐입니다. 10장 = 0.2초 */
+let GAP = 0;        /* 세 덩어리 사이 여백(vw) — 제안값. 3등분한 칸 안에서 가운데로 모으므로
+                       여백을 더 주면 팀 칸만 화면 끝으로 밀립니다 */
+
+/* ── 엠블럼 3종 — 6.1 확정본 도트 격자 그대로 ─────────────────────
+   가문의 문장. 구별은 바깥 프레임이 집니다.
+   배너=CULTURE VANGUARD(앰버) · 방패=CREATIVE RISK-TAKERS(코럴) · 원=RELENTLESS INNOVATORS(민트)
+   11×11 — Galmuri11 한 글자의 그림 상자와 같은 격자. 확대는 정수배만(스크린 순위 ×3) */
+const EM_GRID = [
+  ["███████████","·█·······█·","·█·······█·","·█·██····█·","·█·██··█·█·","·█····██·█·",
+   "·█·█··██·█·","·█····██·█·","·█·······█·","·█···█···█·","·████·████·"],
+  ["███████████","█·········█","█·········█","█··█████··█","█·········█","█·········█",
+   "█·········█","█··█████··█","·█·······█·","··█·····█··","···█████···"],
+  ["····███····","··██···██··","·█·······█·","█··██·██··█","█··██·██··█","█·········█",
+   "█··██·██··█","█··██·██··█","·█·······█·","··██···██··","····███····"]
+];
+const TCOLOR = ["var(--t0)","var(--t1)","var(--t2)"];
+function emblemSVG(t){
+  const c = TCOLOR[t];
+  let r = "";
+  EM_GRID[t].forEach((row,y) => [...row].forEach((ch,x) => {
+    if(ch === "█") r += `<rect x="${x}" y="${y}" width="1" height="1" fill="${c}"/>`;
+  }));
+  return `<svg viewBox="0 0 11 11" shape-rendering="crispEdges">${r}</svg>`;
+}
+
+/* 포스터 단어 30개 — 디알렉티카_포스터대응표_260812.json 그대로 */
+const WORDS = ["응시","포용","뜻밖의 설렘","도전","따뜻한 감수성","관점","변화의 흐름",
+  "프로토타입","상상","기존의 틀","사색","영감의 언덕","본질","인간 중심","조화","경계",
+  "모험가 정신","직관","오래된 사유","감각의 언어","일상","물성","잊힌 흔적","역동성",
+  "헤리티지","지속되는 태도","오래된 언어","도시의 결","손의 감각","방심의 시간"];
+const WORD_W = Math.max(...WORDS.map(w => w.length));   /* 칸 수 — 가장 긴 단어에 맞춥니다 */
+
+const SUR = "김이박최정강조윤장임한오서신권황안송전홍유고문양손배백허남심";
+const GIV = ["서연","지훈","수민","유진","하늘","도윤","서아","재현","지우","소율","준혁","예린",
+             "민준","나윤","지호","채원","시우","현우","아름","은성","도현","수빈","가온","루하"];
+
+/* ── 한글 플랩 — 글자를 훑다 멈춥니다 ────────────────────────────
+   유니코드 완성형은 (초성×21 + 중성)×28 + 종성 순서라, 28씩 물러나면
+   초성과 종성은 그대로 두고 중성만 굴러갑니다.
+   가 → 개 → 갸 … 처럼 같은 자리에서 모음만 넘어가다 목표 글자에 섭니다. */
+const HB = 0xAC00, HE = 0xD7A3, HN = HE - HB + 1, STRIDE = 28;
+function scan(ch, k){
+  const out = [];
+  const c = ch.charCodeAt(0);
+  if(c >= HB && c <= HE){
+    for(let i=k; i>=1; i--) out.push(String.fromCharCode(HB + (((c-HB) - STRIDE*i) % HN + HN) % HN));
+  }else if(/[0-9]/.test(ch)){
+    for(let i=k; i>=1; i--) out.push(String((+ch - i + 100) % 10));
+  }else if(/[A-Z]/.test(ch)){              /* 라틴은 알파벳 순서로 훑습니다 */
+    for(let i=k; i>=1; i--) out.push(String.fromCharCode(65 + ((c-65-i) % 26 + 26) % 26));
+  }else{                                   /* 빈칸도 훑다가 빈칸에 섭니다 */
+    for(let i=k; i>=1; i--) out.push(String.fromCharCode(HB + ((i*STRIDE*13) % HN)));
+  }
+  return out;
+}
+
+/* ⛔ 소리는 폐기했습니다 (2026.08.12 사용자 "그런 수고가 있다면 소리 빼자").
+   브라우저가 자동 재생을 막아 진행자가 창을 열 때 한 번 눌러 줘야 했고,
+   그 한 번을 잊으면 당일 소리 없이 돌아가는 것을 아무도 모릅니다.
+   화면은 소리 없이 돕니다 — 9.1과 같습니다.                              */
+
+/* ── 판 돌리기 — 타이머를 칸마다 두지 않고 한 루프로 돕니다 ── */
+const live = [];        /* {el, seq, target, t0, isEm, last} */
+let raf = null;
+let noAnim = false;     /* 목업 전용 — ?still= 로 멈춘 판을 띄울 때는 안 돌립니다 */
+
+function flip(el, target, delay, isEm){
+  if(noAnim){                                   /* 선 자리만 바로 그립니다 */
+    paint({el, isEm}, target);
+    el.style.transform = "scaleY(1)"; el.style.filter = "brightness(1)";
+    return;
+  }
+  live.push({el, target, seq: isEm ? scanEm(target) : scan(target, K),
+             t0: performance.now() + delay, last: -1, isEm});
+  if(!raf) raf = requestAnimationFrame(loop);
+}
+function scanEm(t){                       /* 엠블럼도 세 종류를 훑다 섭니다 */
+  const out = [];
+  for(let i=K; i>=1; i--) out.push(((t - i) % 3 + 3) % 3);
+  return out;
+}
+function paint(c, v){
+  if(c.isEm) c.el.innerHTML = emblemSVG(v);
+  else c.el.textContent = v;
+}
+function loop(now){
+  for(let i=live.length-1; i>=0; i--){
+    const c = live[i];
+    const e = now - c.t0;
+    if(e < 0) continue;
+    const idx = Math.floor(e / MS);
+    const into = e - idx*MS;
+    /* 한 장 안에서 두 상태뿐 — 접힘 / 펴짐 (5.3 steps) */
+    const folded = into < MS*0.45;
+    c.el.style.transform = folded ? "scaleY(.18)" : "scaleY(1)";
+    c.el.style.filter    = folded ? "brightness(1.9)" : "brightness(1)";
+    if(idx !== c.last){
+      c.last = idx;
+      paint(c, idx < c.seq.length ? c.seq[idx] : c.target);
+    }
+    if(idx >= c.seq.length){               /* 목표 글자에 섰습니다 */
+      c.el.style.transform = "scaleY(1)";
+      c.el.style.filter = "brightness(1)";
+      live.splice(i,1);
+    }
+  }
+  raf = live.length ? requestAnimationFrame(loop) : null;
+}
+
+/* ── 판 만들기 ───────────────────────────────────────────────── */
+function cells(box, n, narrow){
+  box.innerHTML = "";
+  for(let i=0;i<n;i++){
+    const s = document.createElement("span");
+    s.className = "cell" + (narrow ? " narrow" : "");
+    s.textContent = " ";
+    box.appendChild(s);
+  }
+}
+/* 팀 이름 칸 수 — 가장 긴 RELENTLESS INNOVATORS(21)에 맞추고,
+   팀이 넷 이상이면 뒤에 「 1」 두 칸이 더 붙습니다 (5.4 · 5.6 영문만) */
+function tnameW(numbered){ return Math.max(...TYPES.map(t => t.length)) + (numbered ? 2 : 0); }
+
+function buildBoard(nTeams){
+  const w = document.getElementById("w"), p = document.getElementById("p"), t = document.getElementById("t");
+  w.innerHTML = p.innerHTML = t.innerHTML = "";
+  const numbered = nTeams > 3;             /* 5.4 — 팀이 넷 이상이면 엠블럼 옆에 번호 */
+
+  for(let i=0;i<3;i++){                    /* 단어 Top 3 — 단어만, 등수 번호 없음 */
+    const li = document.createElement("li");
+    const f = document.createElement("span"); f.className = "field";
+    cells(f, WORD_W); li.appendChild(f); w.appendChild(li);
+  }
+  for(let i=0;i<3;i++){                    /* 사람 Top 3 — 등수 · 이름 · 엠블럼 */
+    const li = document.createElement("li");
+    li.innerHTML = `<span class="rank">${i+1}</span>`;
+    const f = document.createElement("span"); f.className = "field";
+    cells(f, 3); li.appendChild(f);
+    const wrap = document.createElement("span"); wrap.className = "emwrap";
+    const em = document.createElement("span"); em.className = "em"; wrap.appendChild(em);
+    if(numbered){                                  /* 팀이 셋이면 아예 안 붙입니다 (5.5) */
+      const n = document.createElement("span"); n.className = "cell narrow emnum";
+      wrap.appendChild(n);
+    }
+    li.appendChild(wrap);
+    p.appendChild(li);
+  }
+  /* 팀 — 등수 · 엠블럼 · 유형 이름. 팀이 몇이든 Top 3 (2026.08.12 사용자) */
+  for(let i=0;i<3;i++){
+    const li = document.createElement("li");
+    li.innerHTML = `<span class="rank">${i+1}</span>`;
+    const em = document.createElement("span"); em.className = "em"; li.appendChild(em);
+    const f = document.createElement("span"); f.className = "field tname";
+    cells(f, tnameW(numbered), true); li.appendChild(f);
+    t.appendChild(li);
+  }
+  fitTeamNames();
+}
+
+/* ── 픽셀이 안 깨지는 크기로만 씁니다 ─────────────────────────────
+   6.1 — Galmuri11은 em = 12px 단위라 글자 크기는 12의 배수,
+        엠블럼은 11×11 격자라 확대는 정수배(스크린 순위 ×3 = 33px).
+   창 크기에 따라 재되, 반드시 그 배수로 내려 앉힙니다.                */
+const snap = (px, unit) => Math.max(unit, Math.round(px/unit)*unit);
+function snapSizes(){
+  const root = document.documentElement;
+  root.style.setProperty("--glyph", snap(innerWidth*0.026, 12) + "px");   /* 단어·이름 */
+  root.style.setProperty("--rank",  snap(innerWidth*0.016, 12) + "px");   /* 등수 번호 */
+  root.style.setProperty("--em",    snap(innerWidth*0.017, 11) + "px");   /* 엠블럼 ×n */
+  root.style.setProperty("--stage", snap(innerWidth*0.025, 12) + "px");   /* 단계 제목 */
+  root.style.setProperty("--title", snap(innerWidth*0.019, 12) + "px");   /* 게임 이름 */
+  root.style.setProperty("--sub",   snap(innerWidth*0.0125,12) + "px");   /* 덩어리 제목 */
+}
+
+/* 팀 이름이 칸을 벗어나지 않게 — 9.1에서 정한 ③글자 축소만 씁니다(한 줄이라 두 칸이 없습니다).
+   12의 배수 중에서 들어가는 가장 큰 것을 고릅니다 */
+function fitTeamNames(){
+  const ol = document.getElementById("t");
+  const sec = ol.parentElement;
+  const root = document.documentElement;
+  for(const s of [60,48,36,24,12]){
+    root.style.setProperty("--tname", s + "px");
+    if(ol.offsetWidth <= sec.clientWidth) return;
+  }
+}
+
+/* ── 창작을 흉내 냅니다 ──────────────────────────────────────── */
+let people = [], hits = {}, N = 30, clock = 0, timer = null, paused = false, STILL = 0, flips = 0;
+
+function teams(){
+  const out = [];
+  TYPES.forEach((_,ti) => {
+    const mine = people.filter(p => p.type === ti);
+    if(mine.length > CAP){
+      out.push({t:ti, n:1, members:mine.filter(p => p.idxInType%2===0)});
+      out.push({t:ti, n:2, members:mine.filter(p => p.idxInType%2===1)});
+    }else{
+      out.push({t:ti, n:0, members:mine});
+    }
+  });
+  return out;
+}
+
+function setup(n){
+  clearTimeout(timer);
+  N = n; clock = 0; flips = 0;
+  people = Array.from({length:n}, (_,i) => ({
+    name: SUR[i % SUR.length] + GIV[(i*7) % GIV.length],
+    type: i % 3,
+    idxInType: Math.floor(i/3),
+    got: 0,        /* 쓴 문장 */
+    at: 0          /* 그 개수에 언제 닿았나 — 동점은 먼저 닿은 쪽이 위 */
+  }));
+  hits = {}; WORDS.forEach(w => hits[w] = {n:0, at:0});
+  live.length = 0;
+  buildBoard(teams().length);
+  prev = {w:"", p:"", t:""};
+  document.querySelectorAll("#btns button").forEach(b =>
+    b.setAttribute("aria-pressed", String(+b.dataset.n === n)));
+  /* ?still=40 — 문장 40편이 쌓인 판을 멈춘 채로 띄웁니다 (스크린샷 확인용) */
+  /* 문장이 하나씩 쌓이는 것을 그대로 돌리되 판은 안 돌립니다 —
+     그래야 「판이 갈린 횟수」가 실제 수치가 됩니다 */
+  if(STILL){
+    noAnim = true; paused = true;
+    for(let i=0;i<STILL;i++){ one(); rank(false); }
+  }
+  /* 판을 한 번 채워 넣습니다 — 처음에도 좌르륵 */
+  rank(true);
+  noAnim = false;
+  step();
+}
+
+/* 문장 한 편 제출 (P6).
+   문장에는 쌍의 두 단어를 정확히 써야 제출되므로 서버가 어떤 단어로 쓴 문장인지 압니다 */
+function one(){
+  clock++;
+  const p = people[Math.floor(Math.random()*people.length)];
+  p.got++; p.at = clock;
+  const w = WORDS[Math.floor(Math.random()*WORDS.length)];
+  hits[w].n++; hits[w].at = clock;
+}
+
+function step(){
+  clearTimeout(timer);
+  if(paused) return;
+  one();
+  rank(false);
+  timer = setTimeout(step, 380 + Math.random()*520);
+}
+
+/* 동점은 먼저 닿은 쪽이 위 — 이미 올라선 자리는 따라붙은 쪽이 밀어내지 못합니다 */
+let prev = {w:"", p:"", t:""};
+function rank(force){
+  const W = Object.entries(hits).filter(([,v]) => v.n>0)
+    .sort((a,b) => b[1].n - a[1].n || a[1].at - b[1].at).slice(0,3).map(([k]) => k);
+  const P = [...people].sort((a,b) => b.got - a.got || a.at - b.at).slice(0,3);
+  /* 팀도 Top 3 — 팀이 여섯이어도 세 줄입니다 (2026.08.12 사용자) */
+  const T = teams().map(g => {
+    const sum = g.members.reduce((s,m) => s+m.got, 0);
+    return {...g, avg: g.members.length ? sum/g.members.length : 0,
+                  at: Math.max(0, ...g.members.map(m => m.at))};
+  }).sort((a,b) => b.avg - a.avg || a.at - b.at).slice(0,3);
+
+  const kw = W.join("|"), kp = P.map(x => x.name).join("|"), kt = T.map(x => x.t+"-"+x.n).join("|");
+  const changed = force || kw!==prev.w || kp!==prev.p || kt!==prev.t;
+  if(changed && !force) flips++;
+  gauge();
+  if(!changed) return;                 /* 개수만 올랐으면 판은 가만히 있습니다 */
+  prev = {w:kw, p:kp, t:kt};
+
+  /* 어느 하나가 바뀌면 세 목록 전부가 한 번 좌르륵 — 왼쪽부터 차례로 */
+  const wl = document.querySelectorAll("#w li"), pl = document.querySelectorAll("#p li"),
+        tl = document.querySelectorAll("#t li");
+
+  wl.forEach((li,i) => {
+    const pad = Math.floor((WORD_W - (W[i]||"").length)/2);      /* 가운데로 */
+    const line = " ".repeat(pad) + (W[i]||"") + " ".repeat(WORD_W - pad - (W[i]||"").length);
+    [...li.querySelectorAll(".cell")].forEach((c,j) => flip(c, line[j], (i + j) * MS * 0.9));
+  });
+  pl.forEach((li,i) => {
+    const x = P[i]; const g = x ? teams().find(q => q.members.includes(x)) : null;
+    const nm = (x ? x.name : "").padEnd(3," ");
+    [...li.querySelectorAll(".field .cell")].forEach((c,j) => flip(c, nm[j], (i + j) * MS * 0.9));
+    flip(li.querySelector(".em"), x ? x.type : 0, (i + 3) * MS * 0.9, true);
+    const num = li.querySelector(".emnum");
+    if(num){
+      num.style.setProperty("--tc", x ? TCOLOR[x.type] : "var(--name)");   /* 숫자도 유형 색 */
+      flip(num, g && g.n ? String(g.n) : " ", (i + 4) * MS * 0.9);
+    }
+  });
+  tl.forEach((li,i) => {
+    const x = T[i];
+    flip(li.querySelector(".em"), x ? x.t : 0, i * MS * 0.9, true);
+    /* 유형 이름 — 팀이 넷 이상이면 뒤에 번호가 붙습니다 (5.4 · 5.6) */
+    const cs = [...li.querySelectorAll(".tname .cell")];
+    const nm = ((x ? TYPES[x.t] + (x.n ? " " + x.n : "") : "")).padEnd(cs.length, " ");
+    cs.forEach((c,j) => flip(c, nm[j], (i + 1 + j*0.35) * MS * 0.9));
+  });
+}
+
+/* ── 계측 ── */
+function gauge(){
+  const c = document.querySelector("#w .cell");
+  document.getElementById("gauge").textContent =
+    `${innerWidth}×${innerHeight} · 참가자 ${N}명 · ${teams().length}팀 · `
+    + `쓴 문장 ${clock} · 판이 갈린 횟수 ${flips}${clock ? ` (문장 ${(clock/Math.max(1,flips)).toFixed(1)}편마다 한 번)` : ""} · `
+    + `글자 ${c ? getComputedStyle(c).fontSize : "-"} · 단어 칸 ${WORD_W} · `
+    + `팀 이름 ${(() => { const x = document.querySelector("#t .tname .cell");
+                          return x ? getComputedStyle(x).fontSize : "-"; })()} · `
+    + `판때기 ${MS}ms × ${K}장 = 글자 하나가 서기까지 ${(MS*(K+1)/1000).toFixed(2)}s`
+    + `${MS < 34 ? " ⚠️ 화면이 1초에 60번 그리므로(16.7ms) 34ms보다 짧으면 접히는 모습이 안 보입니다" : ""}`
+    + ` · 여백 ${GAP}vw`;
+}
+
+/* ── 조작줄 ── */
+const btns = document.getElementById("btns");
+[[24,"3팀"],[30,"3팀 꽉"],[33,"6팀"],[54,"6팀 꽉"]].forEach(([n,why]) => {
+  const b = document.createElement("button");
+  b.textContent = `${n}명 · ${why}`; b.dataset.n = n;
+  b.onclick = () => setup(n);
+  btns.appendChild(b);
+});
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+force.onclick = () => rank(true);
+addEventListener("resize", () => { snapSizes(); fitTeamNames(); gauge(); });
+snapSizes();
+
+const q = new URLSearchParams(location.search);
+const startN = parseInt(q.get("n"));
+if(q.get("ms")) MS = clamp(+q.get("ms"), 20, 200);
+if(q.get("k"))  K  = clamp(+q.get("k"), 1, 20);
+if(q.get("gap")){ GAP = clamp(+q.get("gap"), 0, 12);
+                  document.documentElement.style.setProperty("--gap", GAP+"vw"); }
+if(q.get("still")) STILL = clamp(+q.get("still"), 1, 500);
+setup(startN > 0 ? Math.min(60, startN) : 30);
+</script>
+
+<script src="bus.js"></script>
+</body>
+</html>

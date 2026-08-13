@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>디알렉티카 — P6 문장 창작 (모바일)</title>
+<style>
+  :root{
+    --bg:#101C8C; --bg-2:#0A1266; --line:#4E60D8; --name:#FFFFFF; --dim:#3A49A8;
+    --t0:#FFC83D; --t1:#FF7A8A; --t2:#5FE6B0;
+    --phoneW:390px; --phoneH:844px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:var(--bg-2); color:var(--name);
+    font-family:"Galmuri11","Apple SD Gothic Neo",monospace;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:1.2vh; padding:1.6vh 0; overflow:hidden}
+  .phone{position:relative; width:var(--phoneW); height:var(--phoneH); background:var(--bg);
+    overflow:hidden; flex:0 0 auto; display:flex; flex-direction:column; transform-origin:50% 0}
+  .phone::after{content:""; position:absolute; inset:0; pointer-events:none; z-index:9;
+    background:repeating-linear-gradient(to bottom, rgba(255,255,255,.045) 0 1px, transparent 1px 3px)}
+
+  /* 헤더 — 게임 이름은 **자리와 무관하게 화면 한가운데** 섭니다 */
+  .head{flex:0 0 auto; height:56px; position:relative; border-bottom:1px solid var(--line);
+        display:flex; align-items:center}
+  .head .slot{width:22px; height:22px; margin-left:12px}
+  .head .ttl{position:absolute; left:0; right:0; text-align:center;
+             font-size:24px; letter-spacing:.08em; pointer-events:none}
+  #drawerBtn{position:absolute; right:12px; font-family:inherit; font-size:18px; letter-spacing:.06em;
+    background:var(--name); color:var(--bg); border:0; padding:6px 8px; cursor:pointer}
+
+  main{flex:1 1 auto; position:relative; min-height:0; overflow:hidden;
+       display:flex; flex-direction:column; align-items:center}
+  #toast{position:absolute; left:0; right:0; top:0; z-index:8; padding:14px 12px;
+    background:var(--name); color:var(--bg); font-size:24px; text-align:center;
+    transform:translateY(-100%); line-height:1.5; transition:transform .18s steps(3)}
+  #toast.on{transform:translateY(0)}
+
+  /* 판은 가운데에 섭니다. 키보드가 올라오면 그만큼 위로 밀립니다 */
+  /* ⚠️ 키보드가 올라오면 판이 남는 높이를 넘길 수 있습니다. justify-content:center 로 두면
+     넘치는 만큼 **위가 잘립니다** — auto 여백으로 가운데에 놓아야 잘리지 않고 스크롤됩니다 */
+  .mid{flex:1 1 auto; display:flex; flex-direction:column; align-items:center;
+       min-height:0; width:100%; overflow-y:auto}
+  .mid > :first-child{margin-top:auto}
+  .mid > :last-child{margin-bottom:auto}
+  /* 키보드가 올라오면 여백을 좁혀 ENT까지 한 화면에 들어오게 합니다 */
+  .mid.kbup .deck{margin-top:12px}
+  .mid.kbup .count{margin-top:8px}
+  .mid.kbup .inbox{margin-top:12px; min-height:120px}
+  .mid.kbup .entrow{margin-top:8px}
+  .mid::-webkit-scrollbar{width:6px}
+  .mid::-webkit-scrollbar-track{background:transparent}
+  .mid::-webkit-scrollbar-thumb{background:var(--line)}
+  .guide{font-size:24px; color:var(--name); letter-spacing:.04em; line-height:1.35;
+         padding:0 16px; text-align:center; word-break:keep-all}
+
+  /* 카드 — 한 번에 한 장. **옆 카드는 안 보입니다** */
+  .deck{display:flex; align-items:center; justify-content:center; gap:8px;
+        width:100%; margin-top:28px}
+  /* ⚠️ 카드를 flex 로 두면 완성된 문장이 **조각마다 줄이 갈립니다**(반전 블록·밑줄이
+        각각 한 덩어리가 됩니다). 문장은 보통 글줄로 흐르게 두고,
+        아직 안 쓴 쌍일 때만 flex 로 씁니다 */
+  .card{flex:0 0 auto; width:270px; min-height:130px; padding:16px; touch-action:none;
+        border:2px solid var(--name); background:var(--bg);
+        font-size:24px; line-height:1.45; word-break:keep-all; overflow-wrap:anywhere; display:block}
+  /* 문장이 길면 카드가 아래로 늘어납니다 (2026.08.13 사용자) */
+  .card.pair{display:flex; flex-wrap:wrap; align-items:flex-start; gap:0 8px}
+  /* `:` 는 앞 단어에 붙여 두고, 넘칠 때 뒷말만 다음 줄로 내려갑니다 — 서랍과 같은 결 */
+  .lhs{display:inline-flex; align-items:center; gap:8px}
+  .je{background:var(--name); color:var(--bg); padding:2px 5px}
+  .co{color:var(--name)}
+  .ban{color:var(--name); text-decoration:underline; text-underline-offset:6px}
+  /* 화살표는 화면 끝이 아니라 카드 옆, 손가락이 닿는 크기로 (2026.08.13 사용자) */
+  #prev{order:0} .card{order:1} #next{order:2}
+  /* 테두리 없이 글자만. 누르는 면적은 그대로 44×64px입니다 (2026.08.13 사용자) */
+  .arrow{flex:0 0 auto; width:44px; height:64px; font-size:24px; color:var(--name);
+         background:transparent; border:0; cursor:pointer}
+  /* 완성 수는 흐리게 두지 않습니다 */
+  .count{margin-top:14px; font-size:24px; color:var(--name); letter-spacing:.1em}
+
+  /* 입력 — 밑줄이 아니라 **박스 안에 문장이 채워집니다** */
+  .inbox{margin-top:22px; width:330px; min-height:152px; padding:12px 14px;
+         border:2px solid var(--name); font-size:24px; line-height:1.4;
+         white-space:pre-wrap; word-break:keep-all; overflow-wrap:anywhere;
+         overflow:hidden; cursor:text}
+  .inbox.hide{visibility:hidden}
+  .caret{display:inline-block; width:12px; height:24px; background:var(--name);
+         vertical-align:-3px}
+  .caret.off{background:transparent}
+  .entrow{margin-top:14px; display:flex; justify-content:flex-end; width:330px}
+  #ent{font-family:inherit; font-size:24px; padding:8px 14px; background:transparent;
+       color:var(--dim); border:2px solid var(--dim); cursor:not-allowed}
+  #ent.on{color:var(--name); border-color:var(--name); cursor:pointer}
+  .entrow.hide{visibility:hidden}
+  .msg{height:24px; margin-top:12px; font-size:18px; color:var(--name)}
+  #hidden{position:absolute; opacity:0; width:1px; height:1px; border:0; padding:0}
+  #kb{flex:0 0 auto; width:100%; height:0; overflow:hidden; border-top:2px solid var(--line);
+      display:flex; align-items:center; justify-content:center; font-size:12px;
+      color:var(--line); letter-spacing:.1em;
+      background:repeating-linear-gradient(135deg, rgba(78,96,216,.18) 0 6px, transparent 6px 12px)}
+  #kb.on{height:300px}
+
+  /* 서랍 */
+  #drawer{position:absolute; inset:0; background:var(--bg); display:none;
+          flex-direction:column; padding:16px 12px; overflow-y:auto; z-index:7}
+  #drawer.on{display:flex}
+  #drawer::-webkit-scrollbar{width:6px}
+  #drawer::-webkit-scrollbar-track{background:transparent}
+  #drawer::-webkit-scrollbar-thumb{background:var(--line)}
+  .drow{display:flex; align-items:flex-start; gap:8px; font-size:24px; line-height:1.25;
+        border-bottom:1px solid var(--line); padding-bottom:10px; margin-bottom:12px}
+  .drow .no{color:var(--name); width:2.4em; flex:0 0 auto}
+  .drow .txt{flex:1 1 auto; min-width:0; display:flex; flex-wrap:wrap; gap:8px; align-items:center}
+  .drow .ban{text-decoration:none}     /* 서랍 목록에는 밑줄이 없습니다 */
+
+  .ctl{flex:0 0 auto; width:min(96vw,940px); border-top:1px solid var(--line); padding-top:.8vh;
+       display:flex; flex-direction:column; align-items:center; gap:.5vh;
+       font-size:12px; color:var(--line); letter-spacing:.06em; text-align:center}
+  .ctl .help b{color:var(--name); font-weight:400}
+  .ctl .row{display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:6px}
+  .ctl .lbl{opacity:.9; margin-right:4px}
+  .ctl button{font-family:inherit; font-size:12px; letter-spacing:.06em; background:transparent;
+    color:var(--line); border:1px solid var(--line); padding:4px 8px; cursor:pointer}
+  #gauge{opacity:.8}
+</style>
+</head>
+<body>
+
+<div class="phone" id="phone">
+  <div class="head">
+    <span class="slot" id="hslot"></span>
+    <span class="ttl">디알렉티카</span>
+    <button id="drawerBtn">서랍</button>
+  </div>
+
+  <main>
+    <div id="toast"></div>
+
+    <div class="mid" id="mid">
+      <p class="guide" id="guide"></p>
+
+      <div class="deck" id="deck">
+        <div class="card" id="card"></div>
+        <button class="arrow" id="prev">◀</button>
+        <button class="arrow" id="next">▶</button>
+      </div>
+      <p class="count" id="count"></p>
+
+      <div class="inbox" id="inbox"></div>
+      <div class="entrow" id="entrow"><button id="ent">ENT</button></div>
+      <p class="msg" id="msg"></p>
+    </div>
+
+    <div id="kb">휴대폰 기본 키보드가 차지하는 높이</div>
+    <input id="hidden" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <div id="drawer"></div>
+  </main>
+</div>
+
+<div class="ctl">
+  <p class="help">아래 줄은 <b>목업에만 있는 조작줄</b>입니다. 실제 폰에는 없습니다.
+    카드는 <b>좌우로 끌거나 ◀▶</b>로 넘깁니다. 입력 박스를 눌러야 키보드가 올라옵니다.</p>
+  <div class="row">
+    <button id="reset">처음부터 다시</button>
+    <button id="prefill">두 편 써 둔 상태로</button>
+    <span class="lbl">팝업</span>
+    <button id="r1">내가 1위</button>
+    <button id="r2">우리 팀 순위 변동</button>
+  </div>
+  <p id="gauge"></p>
+</div>
+
+<script>
+/* ── 목업 전용 ────────────────────────────────────────────────
+   P6 — 재료를 고르는 일과 문장을 짓는 일을 한자리에서 합니다(6.6).
+
+   2026.08.12 사용자 피드백으로 고친 것
+   ① 판을 **가운데**로. 키보드가 올라오면 그만큼 밀립니다
+   ② **옆 카드를 안 보입니다** — 걸쳐 보이던 안은 폐기
+   ③ 카드가 한 줄에 안 들어가면 **`:` 뒤에서** 줄을 넘깁니다(서랍과 같은 결)
+   ④ 아래 숫자는 카드 위치가 아니라 **완성한 문장 수**입니다 — 들어가면 `00 / 07`
+   ⑤ 입력은 밑줄이 아니라 **박스 안에 문장이 채워지는** 형태. 띄어쓰기가 그대로 보입니다
+   ⑥ 카드 테두리를 진하게
+   ⑦ **문장 안에서는 내가 쓴 말에 밑줄**을 다시 긋습니다 — 서랍 목록과 달리
+      문장 안에서는 두 단어가 섞여 있어 표시가 없으면 못 가립니다(서랍은 그대로 맨 글자)  */
+
+const MYTYPE = 1;
+const EM_GRID = [
+  ["███████████","·█·······█·","·█·······█·","·█·██····█·","·█·██··█·█·","·█····██·█·",
+   "·█·█··██·█·","·█····██·█·","·█·······█·","·█···█···█·","·████·████·"],
+  ["███████████","█·········█","█·········█","█··█████··█","█·········█","█·········█",
+   "█·········█","█··█████··█","·█·······█·","··█·····█··","···█████···"],
+  ["····███····","··██···██··","·█·······█·","█··██·██··█","█··██·██··█","█·········█",
+   "█··██·██··█","█··██·██··█","·█·······█·","··██···██··","····███····"]
+];
+const TC = ["var(--t0)","var(--t1)","var(--t2)"];
+
+const CARDS = [
+  {je:"따뜻한 감수성", ban:"서늘한 이성", s:""},
+  {je:"기존의 틀",     ban:"새로운 시도", s:""},
+  {je:"응시",         ban:"곁눈질",     s:""},
+  {je:"도전",         ban:"안주",       s:""},
+  {je:"일상",         ban:"사건",       s:""},
+  {je:"경계",         ban:"연결",       s:""},
+  {je:"물성",         ban:"관념",       s:""}
+];
+const TYPE_MS = 60, BLINK = 500;
+const $ = s => document.querySelector(s);
+let at = 0, mine = "", caretOn = true, blink = null, timers = [];
+const later = (ms,fn) => timers.push(setTimeout(fn, ms));
+
+$("#hslot").innerHTML = (() => {
+  let r = "";
+  EM_GRID[MYTYPE].forEach((row,y) => [...row].forEach((ch,x) => {
+    if(ch === "█") r += `<rect x="${x}" y="${y}" width="1" height="1" fill="${TC[MYTYPE]}"/>`;
+  }));
+  return `<svg width="22" height="22" viewBox="0 0 11 11" shape-rendering="crispEdges">${r}</svg>`;
+})();
+
+/* 문장 안 표기 — 정은 반전 블록, 내가 쓴 말은 밑줄 */
+function sentence(c){
+  return c.s.replace(c.je, `<span class="je">${c.je}</span>`)
+            .replace(c.ban, `<span class="ban">${c.ban}</span>`);
+}
+/* 아직 안 쓴 카드 — `정 :` 가 한 덩어리, 뒷말은 넘칠 때 아랫줄로 */
+function pairMarkup(c){
+  return `<span class="lhs"><span class="je">${c.je}</span><span class="co">:</span></span>`
+       + `<span class="ban" style="text-decoration:none">${c.ban}</span>`;
+}
+
+function draw(){
+  const c = CARDS[at];
+  $("#card").innerHTML = c.s ? sentence(c) : pairMarkup(c);
+  $("#card").classList.toggle("pair", !c.s);
+  const written = !!c.s;
+  $("#inbox").classList.toggle("hide", written);
+  $("#entrow").classList.toggle("hide", written);
+  if(written) $("#kb").classList.remove("on");
+  /* 아래 숫자는 **완성한 문장 수**입니다 */
+  const done = CARDS.filter(x => x.s).length;
+  $("#count").textContent =
+    `${String(done).padStart(2,"0")} / ${String(CARDS.length).padStart(2,"0")}`;
+  paintBox();
+  gauge();
+}
+function go(d){
+  /* 끝에서 막지 않고 **돕니다** — 양쪽 다 (2026.08.13 사용자) */
+  const n = (at + d + CARDS.length) % CARDS.length;
+  at = n; mine = ""; $("#hidden").value = ""; $("#msg").textContent = "";
+  $("#kb").classList.remove("on"); $("#mid").classList.remove("kbup"); clearInterval(blink);
+  draw();
+}
+
+/* 입력 박스 — 띄어쓰기가 그대로 보이고 길어지면 줄이 늘어납니다 */
+function paintBox(){
+  const box = $("#inbox");
+  box.innerHTML = (mine ? mine.replace(/</g,"&lt;") : "")
+                + `<span class="caret${caretOn ? "" : " off"}"></span>`;
+  /* 박스 크기는 그대로 두고 **글자를 줄입니다**. 12의 배수만 씁니다(6.1 — 픽셀이 깨집니다) */
+  /* ⚠️ 24 → 12 두 단계로 줄이면 세 줄을 넘는 순간 글자가 반토막 납니다.
+        2px씩 차근차근 줄입니다 (2026.08.13 사용자) */
+  for(const px of [24, 22, 20, 18, 16, 14, 12]){
+    box.style.fontSize = px + "px";
+    box.querySelectorAll(".caret").forEach(c => { c.style.height = px + "px"; c.style.width = (px/2) + "px"; });
+    if(box.scrollHeight <= box.clientHeight) break;
+  }
+  $("#ent").className = mine.length ? "on" : "";
+}
+$("#hidden").addEventListener("input", e => { mine = e.target.value; caretOn = true; paintBox(); gauge(); });
+$("#inbox").addEventListener("click", () => {
+  if(CARDS[at].s) return;
+  $("#hidden").focus(); $("#kb").classList.add("on"); $("#mid").classList.add("kbup");
+  clearInterval(blink); blink = setInterval(() => { caretOn = !caretOn; paintBox(); }, BLINK);
+});
+
+const bare = s => s.replace(/\s+/g, "");
+$("#ent").onclick = () => {
+  if(!mine.length) return;
+  const c = CARDS[at], flat = bare(mine);
+  if(!flat.includes(bare(c.je)) || !flat.includes(bare(c.ban))){
+    const box = $("#inbox");
+    [0,1,2,3,4,5].forEach(i => later(i*50, () =>
+      box.style.transform = `translateX(${[8,-8,8,-8,4,0][i]}px)`));
+    $("#msg").textContent = "두 단어를 정확하게 사용하세요";
+    later(1800, () => $("#msg").textContent = "");
+    return;
+  }
+  clearInterval(blink);
+  c.s = mine; mine = ""; $("#hidden").value = "";
+  $("#kb").classList.remove("on"); $("#mid").classList.remove("kbup"); $("#msg").textContent = "";
+  /* 번쩍이지 않고 **곧바로 다음 카드**로 갑니다 — 앉은 문장을 확인시키지 않습니다
+     (2026.08.13 사용자). 마지막 카드였으면 아직 안 쓴 카드를 찾아 갑니다 */
+  const nextEmpty = CARDS.findIndex((x,i) => i > at && !x.s);
+  const anyEmpty  = CARDS.findIndex(x => !x.s);
+  at = nextEmpty >= 0 ? nextEmpty : (anyEmpty >= 0 ? anyEmpty : at);
+  draw();
+};
+
+/* ── 스와이프 — 눌러서 끌면 넘어갑니다(칸 단위로 뚝, 관성 없음) ── */
+/* ⚠️ 카드가 포인터를 통째로 잡아채면(setPointerCapture) 그 위의 ◀▶ 클릭이 삼켜집니다.
+   그래서 **카드 위에서만** 끌기를 듣고, 가로채지 않습니다 */
+const card = $("#card");
+let x0 = null;
+card.addEventListener("pointerdown", e => { x0 = e.clientX; });
+card.addEventListener("pointermove", e => {
+  if(x0 === null) return;
+  card.style.transform = `translateX(${Math.max(-60, Math.min(60, e.clientX - x0))}px)`;
+});
+function endSwipe(e){
+  if(x0 === null) return;
+  const dx = (e.clientX ?? x0) - x0; x0 = null;
+  card.style.transform = "translateX(0)";
+  if(Math.abs(dx) > 40) go(dx < 0 ? 1 : -1);
+}
+card.addEventListener("pointerup", endSwipe);
+card.addEventListener("pointerleave", endSwipe);
+$("#prev").onclick = () => go(-1);
+$("#next").onclick = () => go(1);
+
+/* ── 서랍 — P6에서도 열립니다 ── */
+$("#drawerBtn").onclick = () => {
+  const d = $("#drawer");
+  if(d.classList.contains("on")){ d.classList.remove("on"); $(".head .ttl").textContent = "디알렉티카"; $("#drawerBtn").textContent = "서랍"; return; }
+  d.innerHTML = "";
+  CARDS.forEach((c,i) => {
+    const r = document.createElement("div");
+    r.className = "drow";
+    r.innerHTML = `<span class="no">${String(i+1).padStart(2,"0")}</span>`
+      + `<span class="txt"><span class="je">${c.je}</span><span class="co">:</span>`
+      + `<span class="ban">${c.ban}</span></span>`;
+    d.appendChild(r);
+  });
+  d.classList.add("on");
+  $(".head .ttl").textContent = "서랍";
+  $("#drawerBtn").textContent = "닫기";
+};
+
+/* ── 순위 알림 (6.12) ── */
+const TOAST_MS = 3500;
+let toastTimer = null;
+function toast(which, no){
+  const t = $("#toast");
+  t.innerHTML = which === 1 ? `현재 ${no}위` : `CREATIVE RISK-TAKERS<br>2위 → 1위`;
+  clearTimeout(toastTimer);
+  t.classList.add("on");
+  toastTimer = setTimeout(() => t.classList.remove("on"), TOAST_MS);
+}
+$("#r1").onclick = () => toast(1,1);
+$("#r2").onclick = () => toast(2);
+
+function gauge(){
+  const done = CARDS.filter(c => c.s).length;
+  $("#gauge").textContent =
+    `폰 390×844 · 카드 ${at+1}번째 · 완성 ${done}/${CARDS.length}편`
+    + ` · ${CARDS[at].s ? "문장이 앉은 카드(입력 박스 없음)" : "아직 안 쓴 카드"}`
+    + ` · 카드/문장/ENT/완성 수 24px · 입력 박스 330×152px 고정, 넘치면 글자를 24→12px로`
+    + ` · 키보드 300px만큼 판이 밀림`;
+}
+
+function start(){
+  timers.forEach(clearTimeout); timers = []; clearInterval(blink);
+  CARDS.forEach(c => c.s = "");
+  at = 0; mine = ""; $("#hidden").value = ""; $("#msg").textContent = "";
+  $("#kb").classList.remove("on"); $("#toast").classList.remove("on");
+  $("#drawer").classList.remove("on"); $("#drawerBtn").textContent = "서랍";
+  const g = "두 단어를 조합해서 문장을 만드세요";
+  $("#guide").textContent = "";
+  for(let i=1;i<=g.length;i++) later(i*TYPE_MS, () => $("#guide").textContent = g.slice(0,i));
+  draw();
+}
+$("#reset").onclick = start;
+$("#prefill").onclick = () => {
+  start();
+  later(30, () => {
+    CARDS[0].s = "따뜻한 감수성이 식으면 그 자리에 서늘한 이성만 남는다";
+    CARDS[1].s = "기존의 틀을 깨는 자리에서 새로운 시도가 시작된다";
+    draw();
+  });
+};
+
+function fit(){
+  const p = $("#phone");
+  const avail = innerHeight - document.querySelector(".ctl").offsetHeight - 40;
+  const s = Math.min(1, avail / 844);
+  p.style.transform = `scale(${s})`;
+  p.style.marginBottom = (844 * (s-1)) + "px";
+}
+addEventListener("resize", fit);
+fit();
+start();
+const q = new URLSearchParams(location.search);
+if(q.get("v") === "written") later(60, () => {
+  CARDS[0].s = "따뜻한 감수성이 식으면 그 자리에 서늘한 이성만 남는다"; draw();
+});
+if(q.get("v") === "long") later(60, () => {                       /* 아주 긴 문장 확인용 */
+  CARDS[0].s = "따뜻한 감수성이 오래도록 식지 않고 남아 있는 사람에게는 서늘한 이성이 "
+             + "닿지 못하는 자리가 하나쯤 있고 그 자리가 결국 그 사람을 설명한다";
+  draw();
+});
+if(q.get("v") === "typinglong") later(60, () => {
+  mine = "따뜻한 감수성이 오래도록 식지 않고 남아 있는 사람에게는 서늘한 이성이 닿지 못하는 "
+       + "자리가 하나쯤 있고 그 자리가 결국 그 사람을 설명한다 그래서 나는 오늘도 그 자리를 본다";
+  $("#hidden").value = mine;
+  $("#kb").classList.add("on"); $("#mid").classList.add("kbup"); paintBox();
+});
+if(q.get("v") === "typing") later(60, () => {
+  mine = "따뜻한 감수성이 식으면 그 자리에 서늘한 이성만 남는다";
+  $("#hidden").value = mine;
+  $("#kb").classList.add("on"); $("#mid").classList.add("kbup"); paintBox();
+});
+</script>
+
+<script src="bus.js"></script>
+</body>
+</html>

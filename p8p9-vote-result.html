@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>디알렉티카 — P8 투표 · P9 내 결과 (모바일)</title>
+<style>
+  :root{
+    --bg:#101C8C; --bg-2:#0A1266; --line:#4E60D8; --name:#FFFFFF; --dim:#3A49A8;
+    --t0:#FFC83D; --t1:#FF7A8A; --t2:#5FE6B0;
+    --phoneW:390px; --phoneH:844px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:var(--bg-2); color:var(--name);
+    font-family:"Galmuri11","Apple SD Gothic Neo",monospace;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:1.2vh; padding:1.6vh 0; overflow:hidden}
+  .phone{position:relative; width:var(--phoneW); height:var(--phoneH); background:var(--bg);
+    overflow:hidden; flex:0 0 auto; display:flex; flex-direction:column; transform-origin:50% 0}
+  .phone::after{content:""; position:absolute; inset:0; pointer-events:none; z-index:9;
+    background:repeating-linear-gradient(to bottom, rgba(255,255,255,.045) 0 1px, transparent 1px 3px)}
+
+  /* 헤더 — 게임 이름은 **언제나 화면 한가운데**. 서랍이 없어도 자리가 안 흔들립니다 */
+  .head{flex:0 0 auto; height:56px; position:relative; border-bottom:1px solid var(--line);
+        display:flex; align-items:center}
+  .head .slot{width:22px; height:22px; margin-left:12px}
+  .head .ttl{position:absolute; left:0; right:0; text-align:center;
+             font-size:24px; letter-spacing:.08em; pointer-events:none}
+  #drawerBtn{position:absolute; right:12px; font-family:inherit; font-size:18px; letter-spacing:.06em;
+    background:var(--name); color:var(--bg); border:0; padding:6px 8px; cursor:pointer}
+  #drawerBtn.hide{display:none}
+
+  main{flex:1 1 auto; position:relative; min-height:0; overflow-y:auto; overflow-x:hidden;
+       display:flex; flex-direction:column; align-items:center; justify-content:center}
+  main::-webkit-scrollbar{width:6px}
+  main::-webkit-scrollbar-track{background:transparent}
+  main::-webkit-scrollbar-thumb{background:var(--line)}
+
+  .guide{font-size:24px; color:var(--name); letter-spacing:.04em;
+         padding:0 16px; text-align:center; word-break:keep-all; flex:0 0 auto}
+
+  /* 문장 카드 두 장 — 높이를 같게 맞춥니다 */
+  .cards{flex:0 0 auto; display:flex; flex-direction:column; gap:20px; margin-top:24px}
+  .vcard{width:330px; min-height:190px; padding:16px; border:2px solid var(--name);
+         background:var(--bg); font-size:24px; line-height:1.4; word-break:keep-all;
+         display:flex; flex-direction:column; cursor:pointer;
+         /* 사라지는 속도와 들어오는 속도를 같게 맞춥니다 (2026.08.13 사용자) */
+         transition:opacity .3s steps(3), transform .3s steps(3)}
+  .vcard.pick{background:var(--name); color:var(--bg)}
+  .vcard.gone{opacity:0; transform:translateX(-40px)}
+  .vcard.enter{opacity:0; transform:translateX(40px)}
+  .by{margin-top:auto; padding-top:12px; display:flex; align-items:center; gap:8px;
+      font-size:18px; color:var(--line)}
+  .by .em{width:22px; height:22px; flex:0 0 auto}
+  .je{background:var(--name); color:var(--bg); padding:2px 5px}
+  .vcard.pick .je{background:var(--bg); color:var(--name)}
+  /* 그 사람이 넣은 말은 밑줄 — 문장 안에서는 표시가 없으면 둘을 못 가립니다 */
+  .ban{text-decoration:underline; text-underline-offset:6px}
+  /* 진행 표시도 흐리게 두지 않습니다 */
+  .pos{flex:0 0 auto; margin-top:18px; font-size:24px; color:var(--name); letter-spacing:.1em}
+
+  /* ── P9 ── */
+  .p9{display:flex; flex-direction:column; align-items:center; padding:24px 0}
+  .p9 .title{font-size:24px; letter-spacing:.04em}
+  .myrank{font-size:36px; letter-spacing:.06em; margin-top:16px;
+          width:330px; text-align:center}
+  .sep{width:330px; border-top:2px solid var(--name); margin:24px 0 18px}
+  /* 「내 결과」와 같은 24px, 흰색, 가운데 (2026.08.13 사용자) */
+  .sub{font-size:24px; color:var(--name); letter-spacing:.04em; margin-bottom:18px;
+       width:330px; text-align:center}
+  .rank{width:330px; display:flex; gap:10px; align-items:flex-start; margin-bottom:14px}
+  .rank .no{font-size:24px; color:var(--name); width:2.4em; flex:0 0 auto}  /* 숫자는 진하게 */
+  .rcard{flex:1 1 auto; padding:14px; border:2px solid var(--name);
+         font-size:24px; line-height:1.4; word-break:keep-all}
+
+  /* 서랍 — P8에서도 열립니다 */
+  #drawer{position:absolute; inset:0; background:var(--bg); display:none;
+          flex-direction:column; padding:16px 12px; overflow-y:auto; z-index:7}
+  #drawer.on{display:flex}
+  .drow{display:flex; align-items:flex-start; gap:8px; font-size:24px; line-height:1.25;
+        border-bottom:1px solid var(--line); padding-bottom:10px; margin-bottom:12px}
+  .drow .no{color:var(--name); width:2.4em; flex:0 0 auto}
+  .drow .txt{flex:1 1 auto; min-width:0; display:flex; flex-wrap:wrap; gap:8px; align-items:center}
+  .drow .ban{text-decoration:none}
+
+  .ctl{flex:0 0 auto; width:min(96vw,940px); border-top:1px solid var(--line); padding-top:.8vh;
+       display:flex; flex-direction:column; align-items:center; gap:.5vh;
+       font-size:12px; color:var(--line); letter-spacing:.06em; text-align:center}
+  .ctl .help b{color:var(--name); font-weight:400}
+  .ctl .row{display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:6px}
+  .ctl button{font-family:inherit; font-size:12px; letter-spacing:.06em; background:transparent;
+    color:var(--line); border:1px solid var(--line); padding:4px 8px; cursor:pointer}
+  #gauge{opacity:.8}
+</style>
+</head>
+<body>
+
+<div class="phone" id="phone">
+  <div class="head">
+    <span class="slot" id="hslot"></span>
+    <span class="ttl" id="htitle">디알렉티카</span>
+    <button id="drawerBtn">서랍</button>
+  </div>
+  <main id="main"></main>
+  <div id="drawer"></div>
+</div>
+
+<div class="ctl">
+  <p class="help">아래 줄은 <b>목업에만 있는 조작줄</b>입니다. 실제 폰에는 없습니다.
+    <b>카드를 탭하는 것이 곧 선택</b>입니다. 건너뛰기도 무승부도 없습니다.</p>
+  <div class="row">
+    <button id="reset">투표 처음부터</button>
+    <button id="near">마지막 한 판만 남기고</button>
+    <button id="end">진행자가 「투표 종료 · 결과 발표」 — 스크린 9.5와 동시에 P9</button>
+  </div>
+  <p id="gauge"></p>
+</div>
+
+<script>
+/* ── 목업 전용 ────────────────────────────────────────────────
+   P8 투표 — 이 화면이 프로토타입의 목적지입니다(6.8). 계측줄에 **한 판에 걸린 시간**을 찍습니다.
+
+   2026.08.12 사용자 피드백으로 고친 것
+   ① 판을 **가운데**로
+   ② 선택 연출 — 잠깐 번쩍이 아니라 **고른 카드는 남고 안 고른 카드가 사라진 뒤** 다음 짝
+   ③ **문장 안에서는 내가 쓴 말에 밑줄** — 표시가 없으면 두 단어를 못 가립니다
+   ④ 서랍이 **실제로 열립니다**(6.8 — P8에도 서랍이 있습니다)
+   ⑤ P9 — 순위를 「내 결과」 **바로 아래**로 · 번호 `01 02 03`에 숫자는 진하게
+      · **「가장 많은 득표를 받은 문장」** 구분 문구 · 서랍이 없으니 게임 이름을 진짜 가운데로
+
+   ⭐ 타이밍 — 진행자의 「투표 종료 · 결과 발표」 **한 번**이 스크린 9.5와 폰 P9를
+      **동시에** 띄웁니다(8.1). 참가자 대기 화면은 이때 없습니다.                 */
+
+const EM_GRID = [
+  ["███████████","·█·······█·","·█·······█·","·█·██····█·","·█·██··█·█·","·█····██·█·",
+   "·█·█··██·█·","·█····██·█·","·█·······█·","·█···█···█·","·████·████·"],
+  ["███████████","█·········█","█·········█","█··█████··█","█·········█","█·········█",
+   "█·········█","█··█████··█","·█·······█·","··█·····█··","···█████···"],
+  ["····███····","··██···██··","·█·······█·","█··██·██··█","█··██·██··█","█·········█",
+   "█··██·██··█","█··██·██··█","·█·······█·","··██···██··","····███····"]
+];
+const TC = ["var(--t0)","var(--t1)","var(--t2)"];
+const MYTYPE = 1, ROUNDS = 12;
+
+const POOL = [
+  {je:"따뜻한 감수성", ban:"서늘한 이성", s:"따뜻한 감수성이 식으면 그 자리에 서늘한 이성만 남는다", by:"홍길동", t:0},
+  {je:"빛", ban:"그늘", s:"빛이 강할수록 그늘도 깊어진다", by:"김서연", t:1},
+  {je:"기존의 틀", ban:"새로운 시도", s:"기존의 틀을 깨는 손끝에서 새로운 시도가 시작된다", by:"박지훈", t:2},
+  {je:"일상", ban:"사건", s:"일상이 오래 쌓이면 그 자체가 사건이 된다", by:"최유진", t:0},
+  {je:"경계", ban:"연결", s:"경계를 지우면 연결이 남는다", by:"정하늘", t:2},
+  {je:"물성", ban:"관념", s:"물성을 만져 본 사람만이 관념을 말할 수 있다", by:"강도윤", t:1},
+  {je:"응시", ban:"곁눈질", s:"응시가 길어질수록 곁눈질은 줄어든다", by:"윤서아", t:0},
+  {je:"도전", ban:"안주", s:"도전을 멈춘 자리에 안주가 들어앉는다", by:"임재현", t:2}
+];
+const MINE = [
+  {je:"따뜻한 감수성", ban:"서늘한 이성", s:"따뜻한 감수성이 식으면 그 자리에 서늘한 이성만 남는다"},
+  {je:"경계", ban:"연결", s:"경계를 지우면 연결이 남는다"},
+  {je:"일상", ban:"사건", s:"일상이 오래 쌓이면 그 자체가 사건이 된다"}
+];
+const MYPAIRS = [
+  {je:"따뜻한 감수성", ban:"서늘한 이성"}, {je:"경계", ban:"연결"},
+  {je:"일상", ban:"사건"}, {je:"응시", ban:"곁눈질"}
+];
+const MYRANK = "30명 중 7위";
+
+const $ = s => document.querySelector(s);
+let round = 1, pair = [], timers = [], t0 = 0, spent = [], onP9 = false;
+const later = (ms,fn) => timers.push(setTimeout(fn, ms));
+const clearAll = () => { timers.forEach(clearTimeout); timers = []; };
+
+function emblem(t, px){
+  let r = "";
+  EM_GRID[t].forEach((row,y) => [...row].forEach((ch,x) => {
+    if(ch === "█") r += `<rect x="${x}" y="${y}" width="1" height="1" fill="${TC[t]}"/>`;
+  }));
+  return `<svg width="${px}" height="${px}" viewBox="0 0 11 11" shape-rendering="crispEdges">${r}</svg>`;
+}
+$("#hslot").innerHTML = emblem(MYTYPE, 22);
+function markup(x){
+  return x.s.replace(x.je, `<span class="je">${x.je}</span>`)
+            .replace(x.ban, `<span class="ban">${x.ban}</span>`);
+}
+
+/* ── P8 ── */
+function deal(){
+  onP9 = false;
+  const pool = [...POOL].sort(() => Math.random() - 0.5);
+  pair = [pool[0], pool[1]];
+  t0 = performance.now();
+  render8();
+}
+function render8(){
+  $("#drawerBtn").classList.remove("hide");
+  $("#main").innerHTML =
+    `<p class="guide">더 좋은 문장을 고르세요</p><div class="cards" id="cards"></div>`
+    + `<p class="pos">${String(round).padStart(2,"0")} / ${ROUNDS}</p>`;
+  pair.forEach((x,i) => {
+    const c = document.createElement("div");
+    c.className = "vcard";
+    c.innerHTML = `<div>${markup(x)}</div>`
+      + `<div class="by"><span class="em">${emblem(x.t,22)}</span>${x.by}</div>`;
+    c.onclick = () => choose(i);
+    c.classList.add("enter");          /* 툭 튀어나오지 않고 같은 속도로 들어옵니다 */
+    $("#cards").appendChild(c);
+  });
+  later(20, () => document.querySelectorAll(".vcard.enter").forEach(c => c.classList.remove("enter")));
+  gauge();
+}
+/* 고른 카드는 남고 안 고른 카드가 사라집니다 — 그러고 나서 다음 짝 */
+/* ⭐ 고른 카드가 **반전된 채로 머물고**(0.9초), 그다음 **두 장이 함께** 사라집니다.
+      한 장만 남아 있던 이전 안은 폐기 — 어정쩡했습니다 (2026.08.13 사용자) */
+const HOLD = 900, FADE = 300;
+function choose(i){
+  clearAll();
+  spent.push((performance.now() - t0) / 1000);
+  const cards = [...document.querySelectorAll(".vcard")];
+  cards.forEach(c => c.onclick = null);
+  cards[i].classList.add("pick");
+  later(HOLD, () => cards.forEach(c => c.classList.add("gone")));
+  later(HOLD + FADE, () => {
+    if(round >= ROUNDS){ done(); return; }
+    round++; deal();
+  });
+}
+function done(){
+  $("#main").innerHTML = `<p class="guide" style="font-size:36px">투표 완료</p>`;
+  gauge();
+}
+
+/* ── P9 — 「투표 종료 · 결과 발표」와 동시에 ── */
+function render9(){
+  clearAll();
+  onP9 = true;
+  $("#drawerBtn").classList.add("hide");     /* P9에는 서랍이 없습니다 */
+  $("#drawer").classList.remove("on");
+  $("#main").innerHTML = `<div class="p9"><p class="title" id="t9"></p><div id="rk"></div></div>`;
+  const title = "내 결과";
+  for(let i=1;i<=title.length;i++) later(i*90, () => $("#t9").textContent = title.slice(0,i));
+
+  /* 순위가 제목 바로 아래에 옵니다 */
+  later(500, () => {
+    const p = document.createElement("p"); p.className = "myrank"; p.textContent = MYRANK;
+    $("#rk").appendChild(p);
+    const s = document.createElement("div"); s.className = "sep"; $("#rk").appendChild(s);
+    const h = document.createElement("p"); h.className = "sub";
+    h.textContent = "가장 많은 득표를 받은 문장";
+    $("#rk").appendChild(h);
+  });
+  /* 문장 카드가 1위부터 하나씩 */
+  MINE.forEach((x,i) => later(800 + i*420, () => {
+    const r = document.createElement("div");
+    r.className = "rank";
+    r.innerHTML = `<span class="no">${String(i+1).padStart(2,"0")}</span>`
+                + `<div class="rcard">${markup(x)}</div>`;
+    $("#rk").appendChild(r);
+    gauge();
+  }));
+  gauge();
+}
+
+/* ── 서랍 (P8에만) ── */
+$("#drawerBtn").onclick = () => {
+  const d = $("#drawer");
+  if(d.classList.contains("on")){
+    d.classList.remove("on"); $("#htitle").textContent = "디알렉티카"; $("#drawerBtn").textContent = "서랍";
+    return;
+  }
+  d.innerHTML = "";
+  MYPAIRS.forEach((p,i) => {
+    const r = document.createElement("div");
+    r.className = "drow";
+    r.innerHTML = `<span class="no">${String(i+1).padStart(2,"0")}</span>`
+      + `<span class="txt"><span class="je">${p.je}</span><span>:</span>`
+      + `<span class="ban">${p.ban}</span></span>`;
+    d.appendChild(r);
+  });
+  d.classList.add("on");
+  $("#htitle").textContent = "서랍";
+  $("#drawerBtn").textContent = "닫기";
+};
+
+function gauge(){
+  const avg = spent.length ? (spent.reduce((a,b)=>a+b,0)/spent.length).toFixed(1) : "—";
+  $("#gauge").textContent =
+    `폰 390×844 · ${onP9 ? "P9 내 결과" : "P8 투표"} · ${round}/${ROUNDS}판`
+    + ` · 한 판에 걸린 시간 평균 ${avg}초 (프로토타입에서 잴 값 · 6.8)`
+    + ` · 카드 높이 둘이 같음 · 문장 24px · 작성자 18px`
+    + ` · 문장 안 표기 — 포스터 단어는 반전 블록, 쓴 사람 말은 밑줄`;
+}
+
+$("#reset").onclick = () => { clearAll(); round = 1; spent = []; deal(); };
+$("#near").onclick = () => { clearAll(); round = ROUNDS; deal(); };
+$("#end").onclick = render9;
+
+function fit(){
+  const p = $("#phone");
+  const avail = innerHeight - document.querySelector(".ctl").offsetHeight - 40;
+  const s = Math.min(1, avail / 844);
+  p.style.transform = `scale(${s})`;
+  p.style.marginBottom = (844 * (s-1)) + "px";
+}
+addEventListener("resize", fit);
+fit();
+deal();
+const q = new URLSearchParams(location.search);
+if(q.get("v") === "9") later(60, render9);
+</script>
+
+<script src="bus.js"></script>
+</body>
+</html>

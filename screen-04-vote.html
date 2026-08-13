@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>디알렉티카 — 스크린 9.4 투표</title>
+<style>
+  :root{
+    --bg:#101C8C; --bg-2:#0A1266; --line:#4E60D8; --name:#FFFFFF;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg); color:var(--name);
+    font-family:"Galmuri11","Apple SD Gothic Neo",monospace;
+    display:flex; flex-direction:column; padding:3vh 4vw; overflow:hidden;
+  }
+
+  header{text-align:center; padding-bottom:2vh; border-bottom:1px solid var(--line); flex:0 0 auto}
+  header .ko{font-size:var(--title,36px); letter-spacing:.35em}
+  header .la{font-size:var(--title,36px); letter-spacing:.35em; color:var(--line); margin-left:1.2em}
+
+  /* ── 단계 제목 — 9.2·9.3과 같은 방식(원어 병기 · 화면에서 가장 큰 글자) ── */
+  .stage{
+    flex:0 0 auto; text-align:center; padding-top:3.4vh; font-weight:400;
+  }
+  .stage .ko{font-size:var(--stage,48px); letter-spacing:.12em}
+  .stage .la{font-size:var(--stage,48px); letter-spacing:.12em; color:var(--line); margin-left:1em}
+
+  main{
+    flex:1 1 auto; display:flex; flex-direction:column; align-items:stretch;
+    padding:4vh 0; min-height:0; justify-content:center;
+  }
+  /* 좌우 여백은 다른 화면과 같습니다 — body 의 4vw 그대로이고 여기서 더 주지 않습니다 */
+  /* 문장 셋 — 덩어리가 하나입니다. 등수를 달고 그 등수에 맞춰 왼쪽으로 붙습니다 */
+  ol{list-style:none; display:flex; flex-direction:column; gap:4vh}
+  /* ⚠️ line-height:1 이 없으면 글자가 칸(overflow:hidden) 밖으로 밀려 안 보입니다.
+     Galmuri11의 기본 줄높이가 칸 높이(1.16em)보다 큽니다 */
+  li{display:flex; align-items:flex-start; gap:.8vw; line-height:1}
+  .rank{color:var(--line); font-size:var(--rank,36px); width:1.2em; flex:0 0 auto; text-align:right}
+  .lines{display:flex; flex-direction:column; gap:.2em}
+  .row{display:flex}
+
+  /* ── 스플릿 플랩 한 칸 — 9.2와 같습니다 ── */
+  .cell{
+    position:relative; display:inline-block;
+    width:1em; height:1.16em; font-size:var(--glyph,48px);
+    text-align:center; overflow:hidden;
+    transform-origin:50% 0; will-change:transform;
+  }
+
+  /* ── 목업 전용 조작줄 · 확정되면 통째로 지웁니다 ── */
+  footer{
+    flex:0 0 auto; border-top:1px solid var(--line); margin-top:2vh; padding-top:1.2vh;
+    display:flex; flex-direction:column; align-items:center; gap:.5vh;
+    font-size:12px; color:var(--line); letter-spacing:.06em;
+  }
+  footer .help{color:var(--line); opacity:.9; margin-bottom:.3vh}
+  footer .help b{color:var(--name); font-weight:400}
+  footer .row{display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:.5vw}
+  footer button{
+    font-family:inherit; font-size:12px; letter-spacing:.06em;
+    background:transparent; color:var(--line); border:1px solid var(--line);
+    padding:.4vh .6vw; cursor:pointer;
+  }
+  footer button[aria-pressed="true"]{background:var(--name); color:var(--bg); border-color:var(--name)}
+  #gauge{text-align:center; opacity:.8; margin-top:.4vh}
+</style>
+</head>
+<body>
+
+<header><span class="ko">디알렉티카</span><span class="la">DIALECTICA</span></header>
+
+<h1 class="stage"><span class="ko">투표 현황</span><span class="la">VOTING STATUS</span></h1>
+
+<main>
+  <ol id="s"></ol>
+</main>
+
+<footer>
+  <p class="help">아래 줄은 <b>목업에만 있는 조작줄</b>입니다. 실제 화면에는 없고, 값이 정해지면 통째로 지웁니다.</p>
+  <div class="row">
+    <span id="btns"></span>
+    <button id="force">지금 한 번 갈아 보기</button>
+  </div>
+  <p id="gauge"></p>
+</footer>
+
+<script>
+/* ── 목업 전용 ────────────────────────────────────────────────
+   9.4 투표 — 득표 상위 문장 셋만. 실시간으로 순위가 바뀝니다.
+
+   ⭐ 앞 두 화면(9.2·9.3)과 판이 다릅니다 — 덩어리가 하나입니다.
+      ⛔ 작성자 이름 · 소속 팀 엠블럼 · 득표 수 · 등수 번호를 붙이지 않습니다.
+         누가 썼는지는 결과 발표(9.5)에서 처음 밝혀집니다.
+      움직임은 그대로 — 순위가 바뀌면 세 문장이 전부 갈립니다.            */
+
+let MS = 20, K = 10;                 /* 9.2에서 확정된 값 그대로 */
+
+/* ⚠️ 아래 문장은 전부 목업용 임시 예시입니다 — 사용자가 쓴 것이 아닙니다.
+   포스터 단어(디알렉티카_포스터대응표_260812.json)를 하나씩 넣어 만들었습니다.
+   길이를 일부러 다르게 두었습니다 — 6.6은 「문장 길이 제한 없음」입니다.      */
+const SENTENCES = [
+  "본질을 놓치면 장식만 남는다",
+  "일상이 반복될수록 뜻밖의 설렘은 더 크게 온다",
+  "경계를 지우면 연결이 남고 연결이 쌓이면 도시의 결이 된다",
+  "기존의 틀을 깨는 손의 감각이 프로토타입을 만든다",
+  "따뜻한 감수성이 식으면 그 자리에 차가운 계산만 남는다",
+  "빠른 실행이 사색을 밀어내면 관점은 좁아진다",
+  "오래된 사유와 새로운 상상은 같은 자리에서 만난다",
+  "도전을 멈춘 헤리티지는 박물관에 걸린 그림이 된다",
+  "물성을 손으로 만져 본 사람만이 감각의 언어를 쓸 수 있다",
+  "기존의 틀을 지키는 일과 그 틀을 깨는 일은 서로 반대처럼 보이지만 결국 같은 곳을 바라보는 두 개의 태도다"
+];
+
+/* ── 한글 플랩 — 9.2와 같은 방식(모음이 굴러갑니다) ── */
+const HB = 0xAC00, HE = 0xD7A3, HN = HE - HB + 1, STRIDE = 28;
+function scan(ch, k){
+  const out = [];
+  const c = ch.charCodeAt(0);
+  if(c >= HB && c <= HE){
+    for(let i=k; i>=1; i--) out.push(String.fromCharCode(HB + (((c-HB) - STRIDE*i) % HN + HN) % HN));
+  }else if(/[0-9]/.test(ch)){
+    for(let i=k; i>=1; i--) out.push(String((+ch - i + 100) % 10));
+  }else{
+    for(let i=k; i>=1; i--) out.push(String.fromCharCode(HB + ((i*STRIDE*13) % HN)));
+  }
+  return out;
+}
+
+const live = [];
+let raf = null, noAnim = false;
+
+function flip(el, target, delay){
+  if(noAnim){ el.textContent = target; el.style.transform = "scaleY(1)"; el.style.filter = "brightness(1)"; return; }
+  live.push({el, target, seq: scan(target, K), t0: performance.now() + delay, last:-1});
+  if(!raf) raf = requestAnimationFrame(loop);
+}
+function loop(now){
+  for(let i=live.length-1; i>=0; i--){
+    const c = live[i];
+    const e = now - c.t0;
+    if(e < 0) continue;
+    const idx = Math.floor(e / MS);
+    const folded = (e - idx*MS) < MS*0.45;
+    c.el.style.transform = folded ? "scaleY(.18)" : "scaleY(1)";
+    c.el.style.filter    = folded ? "brightness(1.9)" : "brightness(1)";
+    if(idx !== c.last){ c.last = idx; c.el.textContent = idx < c.seq.length ? c.seq[idx] : c.target; }
+    if(idx >= c.seq.length){
+      c.el.style.transform = "scaleY(1)"; c.el.style.filter = "brightness(1)";
+      live.splice(i,1);
+    }
+  }
+  raf = live.length ? requestAnimationFrame(loop) : null;
+}
+
+/* ── 크기 — 12의 배수로만(6.1) ── */
+const snap = (px,u) => Math.max(u, Math.round(px/u)*u);
+function snapSizes(){
+  const r = document.documentElement;
+  r.style.setProperty("--title", snap(innerWidth*0.019, 12) + "px");
+  r.style.setProperty("--stage", snap(innerWidth*0.025, 12) + "px");
+  r.style.setProperty("--sub",   snap(innerWidth*0.0125,12) + "px");
+  r.style.setProperty("--rank",  snap(innerWidth*0.016, 12) + "px");
+  r.style.setProperty("--glyph", snap(innerWidth*0.025, 12) + "px");
+}
+
+/* ── 문장을 칸에 앉힙니다 ─────────────────────────────────────────
+   ⭐ 글자를 줄이지 않습니다. 다른 화면과 같은 크기로 두고,
+      **두 줄을 넘기면 앞부분만 남기고 말줄임표(…)로 자릅니다.**
+      멀리서 읽는 화면이라 글자를 줄이는 쪽이 더 나쁩니다
+      (2026.08.12 사용자 "문장이 너무 길면 말줄임표로 하자. 앞 부분만 보이는 거야").
+   줄을 나눌 때는 낱말 사이에서만 자릅니다 — 낱말 가운데서 자르면 안 읽힙니다. */
+const LINES = 2;                     /* 두 줄 고정 */
+let GLYPH = 48, COLS = 30;
+
+function wrap(text, cols){
+  const words = text.split(" ");
+  const lines = [];
+  let cur = "";
+  for(const w of words){
+    if(!cur.length) cur = w;
+    else if((cur + " " + w).length <= cols) cur += " " + w;
+    else { lines.push(cur); cur = w; }
+  }
+  if(cur.length) lines.push(cur);
+  return lines;
+}
+
+/* 두 줄에 안 들어가면 앞부분만 남기고 말줄임표 */
+function fit(text){
+  const ls = wrap(text, COLS);
+  if(ls.length <= LINES) return ls;
+  const cut = ls.slice(0, LINES);
+  let last = cut[LINES-1];
+  if(last.length > COLS - 1) last = last.slice(0, COLS - 1);
+  cut[LINES-1] = last + "…";
+  return cut;
+}
+
+function layout(){
+  const main = document.querySelector("main");
+  GLYPH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--glyph"));
+  /* 등수 번호와 그 옆 여백을 빼고 남는 폭이 문장 칸입니다 */
+  const rank = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--rank"));
+  const avail = main.clientWidth - (rank * 1.2) - (innerWidth * 0.008);
+  COLS = Math.max(1, Math.floor(avail / GLYPH));
+}
+
+/* ── 판 만들기 ── */
+function build(){
+  layout();
+  const ol = document.getElementById("s");
+  ol.innerHTML = "";
+  for(let i=0;i<3;i++){
+    const li = document.createElement("li");
+    li.innerHTML = `<span class="rank">${i+1}</span>`;   /* 1 · 2 · 3 */
+    const lines = document.createElement("span");
+    lines.className = "lines";
+    for(let n=0;n<LINES;n++){
+      const row = document.createElement("span");
+      row.className = "row";
+      for(let j=0;j<COLS;j++){
+        const c = document.createElement("span");
+        c.className = "cell"; c.textContent = " ";
+        row.appendChild(c);
+      }
+      lines.appendChild(row);
+    }
+    li.appendChild(lines);
+    ol.appendChild(li);
+  }
+}
+
+/* ── 표가 들어오는 것을 흉내 냅니다 ── */
+let votes = {}, clock = 0, flips = 0, timer = null, N = 30, STILL = 0;
+let prev = "";
+
+function setup(n){
+  clearTimeout(timer);
+  N = n; clock = 0; flips = 0; prev = "";
+  votes = {}; SENTENCES.forEach(s => votes[s] = {n:0, at:0});
+  live.length = 0;
+  build();
+  document.querySelectorAll("#btns button").forEach(b =>
+    b.setAttribute("aria-pressed", String(+b.dataset.n === n)));
+  if(STILL){ noAnim = true; for(let i=0;i<STILL;i++){ one(); rank(false); } }
+  rank(true);
+  noAnim = false;
+  if(!STILL) step();
+}
+
+/* 표 한 장 (P8) */
+function one(){
+  clock++;
+  const s = SENTENCES[Math.floor(Math.random()*SENTENCES.length)];
+  votes[s].n++; votes[s].at = clock;
+}
+
+function step(){
+  clearTimeout(timer);
+  one();
+  rank(false);
+  timer = setTimeout(step, 420 + Math.random()*600);
+}
+
+/* 동점은 먼저 닿은 쪽이 위 — 9.2와 같은 규칙 */
+function rank(force){
+  const top = Object.entries(votes)
+    .filter(([,v]) => v.n > 0)
+    .sort((a,b) => b[1].n - a[1].n || a[1].at - b[1].at)
+    .slice(0,3).map(([k]) => k);
+
+  const key = top.join("|");
+  const changed = force || key !== prev;
+  if(changed && !force) flips++;
+  gauge();
+  if(!changed) return;                 /* 표가 늘어도 자리가 그대로면 판은 가만히 */
+  prev = key;
+
+  /* 순위가 바뀌면 세 문장이 전부 갈립니다.
+     ⭐ 가운데로 모으지 않고 등수에 맞춰 왼쪽으로 붙입니다 */
+  [...document.querySelectorAll("#s li")].forEach((li,i) => {
+    const lines = fit(top[i] || "");
+    [...li.querySelectorAll(".row")].forEach((row,n) => {
+      const text = lines[n] || "";
+      [...row.querySelectorAll(".cell")].forEach((c,j) =>
+        flip(c, text[j] || " ", (i*2 + n + j*0.35) * MS * 0.9));
+    });
+  });
+}
+
+function gauge(){
+  const longest = Math.max(...SENTENCES.map(s => s.length));
+  document.getElementById("gauge").textContent =
+    `${innerWidth}×${innerHeight} · 참가자 ${N}명 · 들어온 표 ${clock} · `
+    + `판이 갈린 횟수 ${flips}${clock ? ` (표 ${(clock/Math.max(1,flips)).toFixed(1)}장마다 한 번)` : ""} · `
+    + `글자 ${GLYPH}px · 한 줄 ${COLS}자 × ${LINES}줄 = ${COLS*LINES}자까지(넘으면 … 로 자름) · `
+    + `가장 긴 예시 문장 ${longest}자 · 판때기 ${MS}ms × ${K}장`;
+}
+
+const btns = document.getElementById("btns");
+[[24,"24명"],[30,"30명"],[54,"54명"]].forEach(([n,why]) => {
+  const b = document.createElement("button");
+  b.textContent = why; b.dataset.n = n;
+  b.onclick = () => setup(n);
+  btns.appendChild(b);
+});
+force.onclick = () => rank(true);
+/* 창 크기가 바뀌면 칸 수와 글자 크기를 다시 잡고 판을 새로 짭니다.
+   ⚠️ 이때는 애니메이션 없이 즉시 그립니다 — build()가 칸을 비워 놓고
+      다시 채우는 일을 플랩에 맡기면, 플랩이 도는 동안 판이 빈 채로 남습니다 */
+addEventListener("resize", () => {
+  snapSizes(); build();
+  prev = ""; noAnim = true; rank(true); noAnim = false;
+  gauge();
+});
+
+const q = new URLSearchParams(location.search);
+if(q.get("still")) STILL = Math.max(1, Math.min(500, +q.get("still")));
+snapSizes();
+setup(parseInt(q.get("n")) > 0 ? +q.get("n") : 30);
+</script>
+
+<script src="bus.js"></script>
+</body>
+</html>

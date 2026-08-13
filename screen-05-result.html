@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>디알렉티카 — 스크린 9.5 결과</title>
+<style>
+  :root{
+    --bg:#101C8C; --bg-2:#0A1266; --line:#4E60D8; --name:#FFFFFF;
+    /* 5.2 유형 3색 — 엠블럼에만 씁니다 */
+    --t0:#FFC83D;  /* CULTURE VANGUARD */
+    --t1:#FF7A8A;  /* CREATIVE RISK-TAKERS */
+    --t2:#5FE6B0;  /* RELENTLESS INNOVATORS */
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg); color:var(--name);
+    font-family:"Galmuri11","Apple SD Gothic Neo",monospace;
+    display:flex; flex-direction:column; padding:3vh 4vw; overflow:hidden;
+  }
+
+  header{text-align:center; padding-bottom:2vh; border-bottom:1px solid var(--line); flex:0 0 auto}
+  header .ko{font-size:var(--title,36px); letter-spacing:.35em}
+  header .la{font-size:var(--title,36px); letter-spacing:.35em; color:var(--line); margin-left:1.2em}
+
+  /* ── 단계 제목 — 「결과 발표 FINAL RESULT」 확정(2026.08.12 · 9.0) ── */
+  .stage{flex:0 0 auto; text-align:center; padding-top:2.6vh; font-weight:400}
+  .stage .ko{font-size:var(--stage,48px); letter-spacing:.12em}
+  .stage .la{font-size:var(--stage,48px); letter-spacing:.12em; color:var(--line); margin-left:1em}
+
+  main{
+    flex:1 1 auto; display:flex; flex-direction:column; justify-content:center;
+    gap:3.4vh; padding:3vh 0; min-height:0;
+  }
+  h2{
+    font-size:var(--sub,24px); font-weight:400; letter-spacing:.06em;
+    color:var(--line); padding-bottom:2vh;
+  }
+
+  /* ── 문장 순위 — 화면 폭을 다 씁니다 ─────────────────────────────
+     9.4에 등수만 달고 서 있던 그 셋에, 여기서 작성자가 붙습니다        */
+  ol{list-style:none; display:flex; flex-direction:column; gap:2.4vh}
+  ol li{display:flex; align-items:flex-start; gap:.8vw}
+  .rank{color:var(--line); font-size:var(--rank,36px); width:1.2em; flex:0 0 auto;
+        text-align:right; line-height:1.3}
+  .body{flex:1 1 auto; min-width:0}
+  /* 낱말 가운데서 자르지 않습니다 — 9.4와 같은 규칙 */
+  .sent{font-size:var(--sent,36px); line-height:1.3; word-break:keep-all}
+  /* 작성자 — 문장 첫 글자에 맞춰 아래에 붙습니다 */
+  .by{display:flex; align-items:center; gap:.5em; margin-top:.5em}
+  .by .who{font-size:var(--who,24px); line-height:1}
+
+  /* ── 아래 두 덩어리 ── */
+  .bottom{display:grid; grid-template-columns:repeat(2,minmax(0,1fr))}
+  .bottom .val{display:flex; align-items:center; gap:.6em; font-size:var(--big,36px); line-height:1}
+  .bottom .stack{display:flex; flex-direction:column; gap:1.4vh}   /* 1·2·3위 */
+  /* 등수 번호 — 9.2 개인 순위와 같은 방식(선 색). 동점이면 같은 번호가 나란히 섭니다 */
+  .bottom .no{color:var(--line); width:1.2em; flex:0 0 auto; text-align:right}
+
+  /* 엠블럼 — 6.1: 11×11 격자, 확대는 정수배만 */
+  .em{display:inline-flex; align-items:center; justify-content:center;
+      width:var(--em,22px); height:var(--em,22px); flex:0 0 auto}
+  .em.big{width:var(--embig,44px); height:var(--embig,44px)}
+  .em svg{width:100%; height:100%; display:block}
+  /* 팀 번호 — 엠블럼 오른쪽에 Galmuri11 글자로 (6.1) */
+  .emwrap{display:inline-flex; align-items:flex-end; gap:.15em; flex:0 0 auto}
+  .emnum{line-height:1}
+
+  /* ── 목업 전용 조작줄 · 확정되면 통째로 지웁니다 ── */
+  footer{
+    flex:0 0 auto; border-top:1px solid var(--line); margin-top:1vh; padding-top:1.2vh;
+    display:flex; flex-direction:column; align-items:center; gap:.5vh;
+    font-size:12px; color:var(--line); letter-spacing:.06em;
+  }
+  footer .help{color:var(--line); opacity:.9; margin-bottom:.3vh}
+  footer .help b{color:var(--name); font-weight:400}
+  footer .row{display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:.5vw}
+  footer button{
+    font-family:inherit; font-size:12px; letter-spacing:.06em;
+    background:transparent; color:var(--line); border:1px solid var(--line);
+    padding:.4vh .6vw; cursor:pointer;
+  }
+  footer button[aria-pressed="true"]{background:var(--name); color:var(--bg); border-color:var(--name)}
+  #gauge{text-align:center; opacity:.8; margin-top:.4vh}
+</style>
+</head>
+<body>
+
+<header><span class="ko">디알렉티카</span><span class="la">DIALECTICA</span></header>
+
+<h1 class="stage"><span class="ko">결과 발표</span><span class="la">FINAL RESULT</span></h1>
+
+<main>
+  <!-- 우승 팀 · 최다 득표가 위, 문장 순위가 아래입니다 (2026.08.12 사용자) -->
+  <div class="bottom">
+    <section><h2>우승 팀</h2><div id="team"></div></section>
+    <section><h2>최다 득표</h2><div id="top" class="stack"></div></section>
+  </div>
+
+  <section>
+    <h2>문장 순위</h2>
+    <ol id="s"></ol>
+  </section>
+</main>
+
+<footer>
+  <p class="help">아래 줄은 <b>목업에만 있는 조작줄</b>입니다. 실제 화면에는 없고, 값이 정해지면 통째로 지웁니다.</p>
+  <div class="row">
+    <span id="btns"></span>
+    <button id="again">다른 결과로 다시</button>
+    <button id="tie" aria-pressed="false">최다 득표 동점</button>
+  </div>
+  <p id="gauge"></p>
+</footer>
+
+<script>
+/* ── 목업 전용 ────────────────────────────────────────────────
+   9.5 결과 — 회차를 닫는 화면. 한 화면에 셋이 함께 뜹니다.
+     ① 문장 순위 — 득표 상위 세 편과 **그 작성자** · 소속 팀 엠블럼
+     ② 우승 팀 — 팀 평균으로 가린 팀
+     ③ 최다 득표 — 개인 점수 **3위까지** (동점이면 공동 순위로 같은 번호가 나란히)
+
+   ⭐ 앞 네 화면과 다른 점 — **판이 갈리지 않습니다.**
+      「등장 연출은 없습니다. 투표가 끝나면 즉시 결과판이 됩니다」(9.5)
+      그래서 플랩(20ms × 10장)도, ?still= 도 여기에는 없습니다.
+
+   ⭐ 이 화면이 밝히는 것은 「누가 썼는가」입니다 — 문장 셋은 9.4에서
+      방이 이미 읽었습니다. 감춰 두었던 이름이 여기서 붙습니다.
+   ⭐ 그래서 **말줄임표를 쓰지 않습니다** — 9.4가 두 줄에서 자른 뒷부분의
+      전문이 밝혀지는 자리가 여기입니다(9.4). 세 줄까지 그대로 펴고,
+      그래도 넘치면 글자를 한 단계 줄입니다(12의 배수).                */
+
+const TYPES = ["CULTURE VANGUARD","CREATIVE RISK-TAKERS","RELENTLESS INNOVATORS"];
+const CAP = 10;                                  /* 5.5 — 한 팀 상한 */
+const MAXLINES = 3;                              /* 제안값 */
+
+/* ── 엠블럼 3종 — 6.1 확정본 도트 격자 그대로(9.2에서 옮겨 왔습니다) ── */
+const EM_GRID = [
+  ["███████████","·█·······█·","·█·······█·","·█·██····█·","·█·██··█·█·","·█····██·█·",
+   "·█·█··██·█·","·█····██·█·","·█·······█·","·█···█···█·","·████·████·"],
+  ["███████████","█·········█","█·········█","█··█████··█","█·········█","█·········█",
+   "█·········█","█··█████··█","·█·······█·","··█·····█··","···█████···"],
+  ["····███····","··██···██··","·█·······█·","█··██·██··█","█··██·██··█","█·········█",
+   "█··██·██··█","█··██·██··█","·█·······█·","··██···██··","····███····"]
+];
+const TCOLOR = ["var(--t0)","var(--t1)","var(--t2)"];
+function emblemSVG(t){
+  const c = TCOLOR[t];
+  let r = "";
+  EM_GRID[t].forEach((row,y) => [...row].forEach((ch,x) => {
+    if(ch === "█") r += `<rect x="${x}" y="${y}" width="1" height="1" fill="${c}"/>`;
+  }));
+  return `<svg viewBox="0 0 11 11" shape-rendering="crispEdges">${r}</svg>`;
+}
+/* 엠블럼 + (팀이 넷 이상이면) 번호 */
+function emblem(t, n, big){
+  const num = n ? `<span class="emnum" style="color:${TCOLOR[t]}">${n}</span>` : "";
+  return `<span class="emwrap"><span class="em${big?" big":""}">${emblemSVG(t)}</span>${num}</span>`;
+}
+
+/* ⚠️ 아래 문장은 전부 목업용 임시 예시입니다 — 사용자가 쓴 것이 아닙니다.
+   9.4 목업과 같은 목록입니다(포스터 단어를 하나씩 넣어 만든 것).        */
+const SENTENCES = [
+  "본질을 놓치면 장식만 남는다",
+  "일상이 반복될수록 뜻밖의 설렘은 더 크게 온다",
+  "경계를 지우면 연결이 남고 연결이 쌓이면 도시의 결이 된다",
+  "기존의 틀을 깨는 손의 감각이 프로토타입을 만든다",
+  "따뜻한 감수성이 식으면 그 자리에 차가운 계산만 남는다",
+  "빠른 실행이 사색을 밀어내면 관점은 좁아진다",
+  "오래된 사유와 새로운 상상은 같은 자리에서 만난다",
+  "도전을 멈춘 헤리티지는 박물관에 걸린 그림이 된다",
+  "물성을 손으로 만져 본 사람만이 감각의 언어를 쓸 수 있다",
+  "기존의 틀을 지키는 일과 그 틀을 깨는 일은 서로 반대처럼 보이지만 결국 같은 곳을 바라보는 두 개의 태도다"
+];
+
+const SUR = "김이박최정강조윤장임한오서신권황안송전홍유고문양손배백허남심";
+const GIV = ["서연","지훈","수민","유진","하늘","도윤","서아","재현","지우","소율","준혁","예린",
+             "민준","나윤","지호","채원","시우","현우","아름","은성","도현","수빈","가온","루하"];
+
+/* ── 크기 — 12의 배수(글자) · 11의 정수배(엠블럼) ── */
+const snap = (px,u) => Math.max(u, Math.round(px/u)*u);
+function snapSizes(){
+  const r = document.documentElement;
+  r.style.setProperty("--title", snap(innerWidth*0.019, 12) + "px");   /* 게임 이름 36 */
+  r.style.setProperty("--stage", snap(innerWidth*0.025, 12) + "px");   /* 단계 제목 48 */
+  r.style.setProperty("--sub",   snap(innerWidth*0.0125,12) + "px");   /* 덩어리 제목 24 */
+  r.style.setProperty("--rank",  snap(innerWidth*0.019, 12) + "px");   /* 등수 번호 36 */
+  r.style.setProperty("--sent",  snap(innerWidth*0.019, 12) + "px");   /* 문장 36 */
+  r.style.setProperty("--who",   snap(innerWidth*0.0125,12) + "px");   /* 작성자 이름 24 */
+  r.style.setProperty("--big",   snap(innerWidth*0.019, 12) + "px");   /* 우승 팀 · 최다 득표 36 */
+  r.style.setProperty("--em",    snap(innerWidth*0.0115,11) + "px");   /* 작성자 옆 22 */
+  r.style.setProperty("--embig", snap(innerWidth*0.023, 11) + "px");   /* 아래 두 덩어리 44 */
+}
+
+/* ── 회차 하나를 통째로 흉내 냅니다 ─────────────────────────────── */
+let N = 30, people = [], works = [], TIE = false;
+
+function teams(){
+  const out = [];
+  TYPES.forEach((_,ti) => {
+    const mine = people.filter(p => p.type === ti);
+    if(mine.length > CAP){
+      out.push({t:ti, n:1, members:mine.filter(p => p.idxInType%2===0)});
+      out.push({t:ti, n:2, members:mine.filter(p => p.idxInType%2===1)});
+    }else{
+      out.push({t:ti, n:0, members:mine});
+    }
+  });
+  return out;
+}
+function teamOf(p){
+  const g = teams().find(g => g.t === p.type && g.members.includes(p));
+  return g || {t:p.type, n:0};
+}
+
+function setup(n){
+  N = n;
+  people = Array.from({length:n}, (_,i) => ({
+    name: SUR[(i*3) % SUR.length] + GIV[(i*7) % GIV.length],
+    type: i % 3,
+    idxInType: Math.floor(i/3),
+    score: 0
+  }));
+  /* 문장 열 편에 작성자를 하나씩 붙이고, 표를 뿌립니다 */
+  works = SENTENCES.map((text,i) => ({
+    text, by: people[Math.floor(Math.random()*people.length)],
+    votes: Math.floor(Math.random()*n*0.4) + 1,
+    at: i
+  }));
+  works.sort((a,b) => b.votes - a.votes || a.at - b.at);
+  works.forEach(w => w.by.score += w.votes);
+
+  /* 동점을 눈으로 보기 위한 목업 전용 손질 — 규칙(공동 1위)은 9.5에 있습니다 */
+  if(TIE){
+    const s = [...people].sort((a,b) => b.score - a.score);
+    if(s[1]) s[1].score = s[0].score;
+  }
+  document.querySelectorAll("#btns button").forEach(b =>
+    b.setAttribute("aria-pressed", String(+b.dataset.n === n)));
+  render();
+}
+
+/* 세 줄을 넘기면 글자를 한 단계 줄입니다 — 자르지 않습니다 */
+function fitSentences(){
+  document.querySelectorAll(".sent").forEach(el => {
+    const base = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--sent"));
+    for(const s of [base, base-12, base-24].filter(v => v >= 12)){
+      el.style.fontSize = s + "px";
+      const lh = s * 1.3;
+      if(el.offsetHeight <= lh * MAXLINES + 2) break;
+    }
+  });
+}
+
+function render(){
+  const numbered = teams().length > 3;              /* 5.4 — 팀이 넷 이상이면 번호 */
+
+  /* ① 문장 순위 — 9.4의 그 셋에 작성자가 붙습니다 */
+  const ol = document.getElementById("s");
+  ol.innerHTML = "";
+  works.slice(0,3).forEach((w,i) => {
+    const g = teamOf(w.by);
+    const li = document.createElement("li");
+    li.innerHTML =
+      `<span class="rank">${i+1}</span>` +
+      `<span class="body">` +
+        `<span class="sent">${w.text}</span>` +
+        `<span class="by">${emblem(g.t, numbered ? g.n : 0, false)}` +
+        `<span class="who">${w.by.name}</span></span>` +
+      `</span>`;
+    ol.appendChild(li);
+  });
+
+  /* ② 우승 팀 — 팀 평균(7.1) */
+  const T = teams().map(g => ({...g,
+    avg: g.members.length ? g.members.reduce((s,m) => s+m.score, 0) / g.members.length : 0
+  })).sort((a,b) => b.avg - a.avg)[0];
+  document.getElementById("team").innerHTML =
+    `<div class="val">${emblem(T.t, numbered ? T.n : 0, true)}` +
+    `<span>${TYPES[T.t] + (numbered && T.n ? " " + T.n : "")}</span></div>`;
+
+  /* ③ 최다 득표 — 개인 점수 3위까지 (2026.08.12 사용자 "최다 득표는 3위까지").
+        동점이면 공동 순위로 같은 번호를 나란히 답니다(7.6 · P9와 같은 방식) */
+  const sorted = people.filter(p => p.score > 0).sort((a,b) => b.score - a.score);
+  const winners = [];
+  sorted.forEach((p,i) => {
+    const no = sorted.findIndex(x => x.score === p.score) + 1;   /* 공동 순위 */
+    if(no <= 3) winners.push({p, no});
+  });
+  document.getElementById("top").innerHTML = winners.map(({p,no}) => {
+    const g = teamOf(p);
+    return `<div class="val"><span class="no">${no}</span>`
+         + `${emblem(g.t, numbered ? g.n : 0, true)}<span>${p.name}</span></div>`;
+  }).join("");
+
+  fitSentences();
+  gauge(winners, T);
+}
+
+function gauge(winners, T){
+  const longest = Math.max(...works.slice(0,3).map(w => w.text.length));
+  const sent = document.querySelector(".sent");
+  document.getElementById("gauge").textContent =
+    `${innerWidth}×${innerHeight} · 참가자 ${N}명 · 팀 ${teams().length}개`
+    + ` · 문장 ${sent ? Math.round(parseFloat(sent.style.fontSize)) : 0}px`
+    + `(세 줄까지 펴고 넘치면 한 단계 줄임 · 말줄임표 없음)`
+    + ` · 상위 세 편 중 가장 긴 문장 ${longest}자`
+    + ` · 최다 득표 3위까지 ${winners.length}줄`
+    + `${winners.length > 3 ? "(동점이라 세 줄을 넘었습니다)" : ""}`
+    + ` · 연출 없음(즉시 결과판)`;
+}
+
+const btns = document.getElementById("btns");
+[[24,"24명"],[30,"30명"],[54,"54명"]].forEach(([n,why]) => {
+  const b = document.createElement("button");
+  b.textContent = why; b.dataset.n = n;
+  b.onclick = () => setup(n);
+  btns.appendChild(b);
+});
+again.onclick = () => setup(N);
+tie.onclick = () => { TIE = !TIE; tie.setAttribute("aria-pressed", String(TIE)); setup(N); };
+addEventListener("resize", () => { snapSizes(); render(); });
+
+const q = new URLSearchParams(location.search);
+if(q.get("tie")) { TIE = true; tie.setAttribute("aria-pressed","true"); }
+snapSizes();
+setup(parseInt(q.get("n")) > 0 ? +q.get("n") : 30);
+</script>
+
+<script src="bus.js"></script>
+</body>
+</html>

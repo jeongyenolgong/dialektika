@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>디알렉티카 — P1 정체성 부여 (모바일)</title>
+<style>
+  :root{
+    --bg:#101C8C; --bg-2:#0A1266; --line:#4E60D8; --name:#FFFFFF;
+    /* 5.2 유형 3색 — 엠블럼에만 씁니다 */
+    --t0:#FFC83D;  /* CULTURE VANGUARD · 배너 */
+    --t1:#FF7A8A;  /* CREATIVE RISK-TAKERS · 방패 */
+    --t2:#5FE6B0;  /* RELENTLESS INNOVATORS · 원 */
+    --phoneW:390px; --phoneH:844px;
+    /* P1 가운데 엠블럼 — 11의 정수배만(6.1). ×16 = 176px 제안 */
+    --cell:16px; --empx:176px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg-2); color:var(--name);
+    font-family:"Galmuri11","Apple SD Gothic Neo",monospace;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:1.2vh; padding:1.6vh 0; overflow:hidden;
+  }
+
+  /* ── 폰 한 대 ──────────────────────────────────────────────────
+     참가자 화면은 모바일입니다. 노트북에서 보려고 실제 폰 크기(390×844)
+     상자를 가운데 놓았을 뿐, 상자 안이 곧 실제 화면입니다.            */
+  .phone{
+    position:relative; width:var(--phoneW); height:var(--phoneH);
+    background:var(--bg); overflow:hidden; flex:0 0 auto;
+    display:flex; flex-direction:column;
+    transform-origin:50% 0;
+  }
+  /* 5.4 배경 스캔라인 — 화면 전체에 깔리는 가로 줄 */
+  .phone::after{
+    content:""; position:absolute; inset:0; pointer-events:none; z-index:5;
+    background:repeating-linear-gradient(to bottom,
+      rgba(255,255,255,.045) 0 1px, transparent 1px 3px);
+  }
+
+  /* ── 헤더 (5.4) — 세 칸. P1에는 서랍 버튼이 없습니다 ──
+     왼쪽 엠블럼 자리는 P1에서 비어 있습니다. 여기서 배정받기 때문입니다 */
+  .head{
+    flex:0 0 auto; height:56px; display:grid; grid-template-columns:56px 1fr 56px;
+    align-items:center; border-bottom:1px solid var(--line);
+  }
+  .head .ttl{text-align:center; font-size:24px; letter-spacing:.14em}
+  .head .slot{width:22px; height:22px; margin-left:12px}   /* ×2 = 22px (6.1) */
+
+  main{flex:1 1 auto; position:relative; display:flex; flex-direction:column;
+       align-items:center; justify-content:center; gap:36px}
+
+  /* ① 스캔 라인 — 이것이 판정하는 주체입니다 */
+  #scan{
+    position:absolute; left:0; width:100%; height:2px; top:0; z-index:4;
+    background:var(--name); box-shadow:0 0 12px 2px rgba(255,255,255,.35);
+    display:none;
+  }
+  /* ④ 한 프레임 번쩍 */
+  #flash{position:absolute; inset:0; background:var(--name); display:none; z-index:6}
+
+  /* 엠블럼 — 6.1: 11×11 격자. 확대는 정수배만(한 칸 = --cell) */
+  #em{width:var(--empx); height:var(--empx); display:grid;
+      grid-template-columns:repeat(11,var(--cell)); grid-template-rows:repeat(11,var(--cell))}
+  #em i{display:block; width:var(--cell); height:var(--cell); visibility:hidden}
+  #emline{position:absolute; width:var(--empx); height:2px; background:var(--name); display:none}
+  .emwrap{position:relative; height:var(--empx); display:flex; align-items:flex-start}
+
+  /* ②③ 가운데 한 줄 — 「당신을 읽는 중」이 사라진 자리에 유형 이름이 들어옵니다 */
+  #center{font-size:24px; letter-spacing:.06em; height:24px; line-height:1; text-align:center}
+
+  /* ⑥ 다음 — 도트 테두리 픽셀 버튼 */
+  footer.act{flex:0 0 auto; height:120px; display:flex; align-items:center; justify-content:center}
+  #next{
+    font-family:inherit; font-size:24px; letter-spacing:.2em; padding:12px 36px;
+    background:transparent; color:var(--name); border:2px solid var(--name);
+    visibility:hidden; cursor:pointer;
+  }
+
+  /* ── 목업 전용 조작줄 · 확정되면 통째로 지웁니다 ── */
+  .ctl{
+    flex:0 0 auto; width:min(96vw,880px); border-top:1px solid var(--line); padding-top:.8vh;
+    display:flex; flex-direction:column; align-items:center; gap:.5vh;
+    font-size:12px; color:var(--line); letter-spacing:.06em; text-align:center;
+  }
+  .ctl .help b{color:var(--name); font-weight:400}
+  .ctl .row{display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:6px}
+  .ctl .lbl{opacity:.9; margin-right:4px}
+  .ctl button{
+    font-family:inherit; font-size:12px; letter-spacing:.06em;
+    background:transparent; color:var(--line); border:1px solid var(--line);
+    padding:4px 8px; cursor:pointer;
+  }
+  .ctl button[aria-pressed="true"]{background:var(--name); color:var(--bg-2); border-color:var(--name)}
+  #gauge{opacity:.8}
+</style>
+</head>
+<body>
+
+<div class="phone" id="phone">
+  <div class="head">
+    <span class="slot" id="hslot"></span>
+    <span class="ttl">디알렉티카</span>
+    <span></span>
+  </div>
+
+  <main>
+    <div id="scan"></div>
+    <div id="flash"></div>
+    <span class="emwrap"><span id="em"></span><span id="emline"></span></span>
+    <div id="center"></div>
+  </main>
+
+  <footer class="act"><button id="next">다음</button></footer>
+</div>
+
+<div class="ctl">
+  <p class="help">아래 줄은 <b>목업에만 있는 조작줄</b>입니다. 실제 폰에는 없고, 값이 정해지면 통째로 지웁니다.</p>
+  <div class="row">
+    <button id="replay">처음부터 다시 보기</button>
+    <span class="lbl">받는 유형</span>
+    <span id="types"></span>
+  </div>
+  <div class="row">
+    <span class="lbl">엠블럼이 그려지는 순서 — 🔴 아직 안 정한 것(6.1)</span>
+    <span id="orders"></span>
+  </div>
+  <div class="row">
+    <span class="lbl">가운데 엠블럼 크기 — 11의 정수배만</span>
+    <span id="sizes"></span>
+  </div>
+  <div class="row">
+    <span class="lbl">스캔 라인 — 한 번 지나가는 길이</span>
+    <span id="scanms"></span>
+    <span class="lbl" style="margin-left:10px">훑는 횟수</span>
+    <span id="scann"></span>
+  </div>
+  <p id="gauge"></p>
+</div>
+
+<script>
+/* ── 목업 전용 ────────────────────────────────────────────────
+   P1 — QR로 들어와 유형을 받는 화면. 고르는 것이 아니라 받습니다.
+   서버가 없으므로 배정을 흉내 냅니다(묶음 섞기 · 6.1).
+
+   ⭐ 연출은 여섯 동작이 이어진 한 덩어리입니다 — 총 3.4초(6.1, 시작값).
+      ① 스캔 라인 0.5s  ② 「당신을 읽는 중」 + 도트 셋 0.6s
+      ③ 슬롯머신 1.5s   ④ 덜컥 멈춤 · 한 프레임 번쩍 0.2s
+      ⑤ 엠블럼이 도트로 그려짐 0.6s   ⑥ 「다음」 등장
+
+   ⭐ 이 목업이 답해야 하는 것 — **⑤에서 도트가 그려지는 순서**입니다.
+      엠블럼만 따로 돌려 보면 판단이 안 됩니다. 앞의 넷이 어떤 속도로
+      지나갔느냐에 따라 같은 순서도 다르게 느껴지기 때문에
+      여섯 동작을 다 태운 채로 셋을 갈아 끼웁니다.
+
+   ⛔ 색은 엠블럼에만 씁니다(5.2). 글자·선·버튼은 흰색과 회색뿐입니다.
+   ⛔ 전부 steps — 부드럽게 미끄러지는 곳이 한 군데도 없습니다(5.3).      */
+
+const TYPES = [
+  {name:"CULTURE VANGUARD",      color:"var(--t0)", frame:"배너"},
+  {name:"CREATIVE RISK-TAKERS",  color:"var(--t1)", frame:"방패"},
+  {name:"RELENTLESS INNOVATORS", color:"var(--t2)", frame:"원"}
+];
+
+/* ── 엠블럼 3종 — 6.1 확정본 도트 격자 그대로 ── */
+const EM_GRID = [
+  ["███████████","·█·······█·","·█·······█·","·█·██····█·","·█·██··█·█·","·█····██·█·",
+   "·█·█··██·█·","·█····██·█·","·█·······█·","·█···█···█·","·████·████·"],
+  ["███████████","█·········█","█·········█","█··█████··█","█·········█","█·········█",
+   "█·········█","█··█████··█","·█·······█·","··█·····█··","···█████···"],
+  ["····███····","··██···██··","·█·······█·","█··██·██··█","█··██·██··█","█·········█",
+   "█··██·██··█","█··██·██··█","·█·······█·","··██···██··","····███····"]
+];
+
+/* ── 여섯 동작의 길이 (ms) ──
+   ⭐ 스캔 라인은 6.1의 시작값(0.5초 한 번)에서 바뀌었습니다 —
+      **한 번을 천천히, 그리고 여러 번 훑습니다**(2026.08.12 사용자
+      "스캔라인이 조금 천천히 그리고 2-3번 더 나오면 좋겠어").
+      T.scan은 이제 **한 번 지나가는 길이**이고 SCANS가 훑는 횟수입니다.   */
+const T = {scan:700, read:600, slot:1500, stop:200, draw:600};
+let SCANS = 3;
+
+/* ── 엠블럼이 그려지는 순서 — 🔴 셋 중 하나를 고르는 자리 ──
+   문양은 셋 다 가운데 5×5(가로 3–7 · 세로 3–7)에 들어갑니다(6.1) */
+const ORDERS = [
+  ["a", "위에서 아래로 한 줄씩"],
+  ["b", "프레임 먼저, 문양 나중"],
+  ["c", "스캔 라인이 지나간 자리에 남듯"]
+];
+let ORDER = "a", FIXED = null;
+
+/* 도트 하나하나에 「몇 번째로 켜지나」를 매깁니다 */
+function plan(t){
+  const dots = [];
+  EM_GRID[t].forEach((row,y) => [...row].forEach((ch,x) => {
+    if(ch === "█") dots.push({x, y, inner: x>=3 && x<=7 && y>=3 && y<=7});
+  }));
+  if(ORDER === "b"){
+    /* 프레임(바깥) 먼저 — 위에서 아래로. 그다음 가운데 문양 */
+    const frame = dots.filter(d => !d.inner).sort((a,b) => a.y-b.y || a.x-b.x);
+    const inner = dots.filter(d =>  d.inner).sort((a,b) => a.y-b.y || a.x-b.x);
+    const fT = T.draw * 0.65, iT = T.draw - fT;
+    return [
+      ...frame.map((d,i) => ({...d, at: Math.floor(i / frame.length * fT)})),
+      ...inner.map((d,i) => ({...d, at: fT + Math.floor(i / inner.length * iT)}))
+    ];
+  }
+  /* a · c — 위에서 아래로 한 줄씩 (c는 그 자리를 훑는 선이 함께 내려갑니다) */
+  return dots.map(d => ({...d, at: Math.floor(d.y / 11 * T.draw)}));
+}
+
+/* ── 화면 ── */
+const $ = s => document.querySelector(s);
+const em = $("#em"), center = $("#center"), scan = $("#scan"),
+      flash = $("#flash"), next = $("#next"), emline = $("#emline"), hslot = $("#hslot");
+let timers = [], picked = 0, bag = [];
+const later = (ms, fn) => timers.push(setTimeout(fn, ms));
+
+function emblemSVG(t, px){
+  let r = "";
+  EM_GRID[t].forEach((row,y) => [...row].forEach((ch,x) => {
+    if(ch === "█") r += `<rect x="${x}" y="${y}" width="1" height="1" fill="${TYPES[t].color}"/>`;
+  }));
+  return `<svg width="${px}" height="${px}" viewBox="0 0 11 11" shape-rendering="crispEdges">${r}</svg>`;
+}
+
+/* 묶음 섞기 (6.1) — 세 장을 섞어 돌리고 다 돌면 다시 섞습니다 */
+function deal(){
+  if(FIXED !== null) return FIXED;
+  if(!bag.length){ bag = [0,1,2].sort(() => Math.random()-0.5); }
+  return bag.pop();
+}
+
+function reset(){
+  timers.forEach(clearTimeout); timers = [];
+  em.innerHTML = ""; emline.style.display = "none"; hslot.innerHTML = "";
+  for(let y=0;y<11;y++) for(let x=0;x<11;x++){
+    const i = document.createElement("i");
+    i.dataset.k = x + "," + y;
+    em.appendChild(i);
+  }
+  center.textContent = ""; center.style.color = "var(--name)";
+  scan.style.display = "none"; scan.style.top = "0px";
+  flash.style.display = "none"; next.style.visibility = "hidden";
+}
+
+function run(){
+  reset();
+  picked = deal();
+  const t0 = 0;
+
+  /* ① 스캔 라인 — 위→아래로 훑기를 SCANS번 되풀이합니다.
+        칸으로 뚝뚝 끊어 내려갑니다(5.3 steps) */
+  const H = document.querySelector("main").clientHeight, STEPS = 14;
+  scan.style.display = "block";
+  for(let p=0;p<SCANS;p++)
+    for(let i=0;i<=STEPS;i++)
+      later(t0 + p*T.scan + i * (T.scan/STEPS), () => {
+        scan.style.top = Math.round(i/STEPS * H) + "px";
+        if(p === SCANS-1 && i === STEPS) scan.style.display = "none";
+      });
+
+  /* ② 「당신을 읽는 중」 + 도트 점이 하나씩 켜짐 0.6s */
+  const A = t0 + T.scan * SCANS;
+  later(A, () => center.textContent = "당신을 읽는 중");
+  [1,2,3].forEach(n => later(A + n * (T.read/3) - 1,
+    () => center.textContent = "당신을 읽는 중" + "·".repeat(n)));
+
+  /* ③ 슬롯머신 1.5s — 자리를 물려받습니다. 빠르게 시작해 느려집니다 */
+  const B = A + T.read;
+  let at = 0, i = 0;
+  while(at < T.slot){
+    const shown = (i + 1) % 3;
+    later(B + at, () => center.textContent = TYPES[shown].name);
+    at += 40 + Math.round(200 * Math.pow(at / T.slot, 2.2));   /* 점점 느려짐 */
+    i++;
+  }
+
+  /* ④ 덜컥 멈춤 · 한 프레임 번쩍 0.2s */
+  const C = B + T.slot;
+  later(C, () => { center.textContent = TYPES[picked].name; flash.style.display = "block"; });
+  later(C + 60, () => flash.style.display = "none");
+
+  /* ⑤ 엠블럼이 도트로 그려짐 0.6s — 유형 색이 처음 등장하는 자리 */
+  const D = C + T.stop;
+  plan(picked).forEach(d => later(D + d.at, () => {
+    const cell = em.querySelector(`i[data-k="${d.x},${d.y}"]`);
+    cell.style.background = TYPES[picked].color;
+    cell.style.visibility = "visible";
+  }));
+  if(ORDER === "c"){                       /* 훑는 선이 도트를 남기고 지나갑니다 */
+    emline.style.display = "block";
+    for(let r=0;r<=11;r++)
+      later(D + Math.floor(r/11 * T.draw), () => {
+        emline.style.top = (r*8) + "px";
+        if(r === 11) emline.style.display = "none";
+      });
+  }
+
+  /* ⑥ 「다음」 등장 — 자동 전환이 아니라 버튼입니다 */
+  const E = D + T.draw;
+  later(E, () => {
+    next.style.visibility = "visible";
+    hslot.innerHTML = emblemSVG(picked, 22);   /* 헤더 자리에 앉습니다(5.4) */
+    gauge(E);
+  });
+  gauge(E);
+}
+
+function gauge(total){
+  const o = ORDERS.find(([k]) => k === ORDER)[1];
+  $("#gauge").textContent =
+    `폰 ${getComputedStyle(document.documentElement).getPropertyValue("--phoneW").trim()}`
+    + `×${getComputedStyle(document.documentElement).getPropertyValue("--phoneH").trim()}`
+    + ` · 받은 유형 ${TYPES[picked].name}(${TYPES[picked].frame})`
+    + ` · 연출 ${(total/1000).toFixed(1)}초 = 스캔 ${T.scan}×${SCANS}번 + 읽는 중 ${T.read}`
+    + ` + 슬롯 ${T.slot} + 멈춤 ${T.stop} + 엠블럼 ${T.draw}ms`
+    + ` · 그려지는 순서 「${o}」 · 가운데 엠블럼 ${MULT*11}px(11×11 ×${MULT}) · 헤더 22px(×2)`;
+}
+
+/* ── 조작줄 ── */
+const typesBox = $("#types");
+[["무작위",null],["배너",0],["방패",1],["원",2]].forEach(([label,v]) => {
+  const b = document.createElement("button");
+  b.textContent = label; b.dataset.v = String(v);
+  b.setAttribute("aria-pressed", String(FIXED === v));
+  b.onclick = () => {
+    FIXED = v; bag = [];
+    [...typesBox.children].forEach(x => x.setAttribute("aria-pressed", String(x.dataset.v === String(v))));
+    run();
+  };
+  typesBox.appendChild(b);
+});
+const ordersBox = $("#orders");
+ORDERS.forEach(([k,label]) => {
+  const b = document.createElement("button");
+  b.textContent = label; b.dataset.k = k;
+  b.setAttribute("aria-pressed", String(ORDER === k));
+  b.onclick = () => {
+    ORDER = k;
+    [...ordersBox.children].forEach(x => x.setAttribute("aria-pressed", String(x.dataset.k === k)));
+    run();
+  };
+  ordersBox.appendChild(b);
+});
+/* 크기 — 11의 정수배만(6.1). 배수가 아니면 도트가 뭉갭니다 */
+const sizesBox = $("#sizes");
+let MULT = 16;
+function setSize(m){
+  MULT = m;
+  document.documentElement.style.setProperty("--cell", m + "px");
+  document.documentElement.style.setProperty("--empx", (m*11) + "px");
+  [...sizesBox.children].forEach(x => x.setAttribute("aria-pressed", String(+x.dataset.m === m)));
+}
+[8,12,16,20].forEach(m => {
+  const b = document.createElement("button");
+  b.textContent = `×${m} = ${m*11}px` + (m === 8 ? " (원래 값)" : "");
+  b.dataset.m = m;
+  b.onclick = () => { setSize(m); run(); };
+  sizesBox.appendChild(b);
+});
+
+/* 스캔 라인 — 한 번 길이와 훑는 횟수 */
+const msBox = $("#scanms"), nBox = $("#scann");
+[500,700,900,1200].forEach(ms => {
+  const b = document.createElement("button");
+  b.textContent = (ms/1000).toFixed(1) + "초" + (ms === 500 ? " (원래 값)" : "");
+  b.dataset.ms = ms;
+  b.onclick = () => {
+    T.scan = ms;
+    [...msBox.children].forEach(x => x.setAttribute("aria-pressed", String(+x.dataset.ms === ms)));
+    run();
+  };
+  msBox.appendChild(b);
+});
+[1,2,3,4].forEach(n => {
+  const b = document.createElement("button");
+  b.textContent = n + "번"; b.dataset.n = n;
+  b.onclick = () => {
+    SCANS = n;
+    [...nBox.children].forEach(x => x.setAttribute("aria-pressed", String(+x.dataset.n === n)));
+    run();
+  };
+  nBox.appendChild(b);
+});
+
+$("#replay").onclick = run;
+next.onclick = run;      /* 목업에서는 P2가 없으므로 처음으로 돌아갑니다 */
+
+/* 창이 작으면 폰을 통째로 줄여 보여 줍니다 — 안의 크기는 그대로입니다 */
+function fit(){
+  const p = $("#phone");
+  const avail = innerHeight - document.querySelector(".ctl").offsetHeight - 40;
+  const s = Math.min(1, avail / 844);
+  p.style.transform = `scale(${s})`;
+  p.style.marginBottom = (844 * (s-1)) + "px";
+}
+addEventListener("resize", fit);
+
+const q = new URLSearchParams(location.search);
+if(["a","b","c"].includes(q.get("order"))) ORDER = q.get("order");
+if(["0","1","2"].includes(q.get("t"))) FIXED = +q.get("t");
+if(+q.get("scan") > 0) T.scan = +q.get("scan");
+if(+q.get("scans") > 0) SCANS = +q.get("scans");
+[...ordersBox.children].forEach(x => x.setAttribute("aria-pressed", String(x.dataset.k === ORDER)));
+[...typesBox.children].forEach(x => x.setAttribute("aria-pressed", String(x.dataset.v === String(FIXED))));
+[...msBox.children].forEach(x => x.setAttribute("aria-pressed", String(+x.dataset.ms === T.scan)));
+[...nBox.children].forEach(x => x.setAttribute("aria-pressed", String(+x.dataset.n === SCANS)));
+fit();
+run();
+</script>
+
+<script src="bus.js"></script>
+</body>
+</html>

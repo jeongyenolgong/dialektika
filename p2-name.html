@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>디알렉티카 — P2 캐릭터 확인 · 이름 입력 (모바일)</title>
+<style>
+  :root{
+    --bg:#101C8C; --bg-2:#0A1266; --line:#4E60D8; --name:#FFFFFF;
+    --t0:#FFC83D; --t1:#FF7A8A; --t2:#5FE6B0;      /* 5.2 — 엠블럼에만 */
+    --phoneW:390px; --phoneH:844px;
+    --cell:16px; --empx:176px;                      /* P1과 같은 크기(11의 정수배) */
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg-2); color:var(--name);
+    font-family:"Galmuri11","Apple SD Gothic Neo",monospace;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:1.2vh; padding:1.6vh 0; overflow:hidden;
+  }
+  .phone{
+    position:relative; width:var(--phoneW); height:var(--phoneH);
+    background:var(--bg); overflow:hidden; flex:0 0 auto;
+    display:flex; flex-direction:column; transform-origin:50% 0;
+  }
+  .phone::after{
+    content:""; position:absolute; inset:0; pointer-events:none; z-index:5;
+    background:repeating-linear-gradient(to bottom,
+      rgba(255,255,255,.045) 0 1px, transparent 1px 3px);
+  }
+
+  /* 헤더 (5.4) — P2에는 서랍 버튼이 없습니다 */
+  .head{flex:0 0 auto; height:56px; display:grid; grid-template-columns:56px 1fr 56px;
+        align-items:center; border-bottom:1px solid var(--line)}
+  .head .ttl{text-align:center; font-size:24px; letter-spacing:.14em}
+  .head .slot{width:22px; height:22px; margin-left:12px}
+
+  main{flex:1 1 auto; position:relative; display:flex; flex-direction:column;
+       align-items:center; padding-top:64px; gap:24px}
+  #flash{position:absolute; inset:0; background:var(--name); display:none; z-index:6}
+
+  /* 엠블럼 — P1에서 그려진 것이 그대로 남아 위로 올라갑니다 */
+  #em{width:var(--empx); height:var(--empx); display:block}
+  .emwrap{position:relative; transition:none}
+
+  #tname{font-size:24px; letter-spacing:.06em; height:24px; line-height:1}
+
+  /* 입력 묶음 — 아래에서 한 칸씩 그려지며 올라옵니다 */
+  .form{display:flex; flex-direction:column; align-items:center; gap:24px; visibility:hidden}
+  .guide{font-size:24px; color:var(--line); letter-spacing:.04em}
+  /* 입력란은 흰 밑줄과 커서만 — 상자를 두르지 않습니다 */
+  .field{display:flex; align-items:flex-end; gap:0; border-bottom:2px solid var(--name);
+         padding:0 8px 8px; min-width:264px; justify-content:center; height:40px}
+  .field span{font-size:24px; line-height:1}
+  .field .ph{color:var(--line)}
+  .caret{display:inline-block; width:12px; height:24px; background:var(--name)}
+  .caret.off{background:transparent}
+  #hidden{position:absolute; opacity:0; width:1px; height:1px; border:0; padding:0}
+  .count{font-size:12px; color:var(--line); letter-spacing:.06em}
+
+  footer.act{flex:0 0 auto; height:140px; display:flex; align-items:center; justify-content:center}
+  #enter{
+    font-family:inherit; font-size:24px; letter-spacing:.2em; padding:12px 36px;
+    background:transparent; color:var(--line); border:2px solid var(--line); cursor:not-allowed;
+  }
+  #enter.on{color:var(--name); border-color:var(--name); cursor:pointer}
+
+  /* ── 목업 전용 조작줄 · 확정되면 통째로 지웁니다 ── */
+  .ctl{flex:0 0 auto; width:min(96vw,880px); border-top:1px solid var(--line); padding-top:.8vh;
+       display:flex; flex-direction:column; align-items:center; gap:.5vh;
+       font-size:12px; color:var(--line); letter-spacing:.06em; text-align:center}
+  .ctl .help b{color:var(--name); font-weight:400}
+  .ctl .row{display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:6px}
+  .ctl .lbl{opacity:.9; margin-right:4px}
+  .ctl button{font-family:inherit; font-size:12px; letter-spacing:.06em;
+    background:transparent; color:var(--line); border:1px solid var(--line); padding:4px 8px; cursor:pointer}
+  .ctl button[aria-pressed="true"]{background:var(--name); color:var(--bg-2); border-color:var(--name)}
+  #gauge{opacity:.8}
+</style>
+</head>
+<body>
+
+<div class="phone" id="phone">
+  <div class="head">
+    <span class="slot" id="hslot"></span>
+    <span class="ttl">디알렉티카</span>
+    <span></span>
+  </div>
+
+  <main>
+    <div id="flash"></div>
+    <span class="emwrap"><span id="em"></span></span>
+    <div id="tname"></div>
+
+    <div class="form" id="form">
+      <p class="guide">이름을 입력하세요</p>
+      <label class="field" id="field"></label>
+      <p class="count" id="count"></p>
+      <input id="hidden" autocomplete="off" autocapitalize="off" spellcheck="false">
+    </div>
+  </main>
+
+  <footer class="act"><button id="enter">입장</button></footer>
+</div>
+
+<div class="ctl">
+  <p class="help">아래 줄은 <b>목업에만 있는 조작줄</b>입니다. 실제 폰에는 없고, 값이 정해지면 통째로 지웁니다.
+    폰 상자를 누르고 <b>키보드로 직접 쳐 보세요</b>.</p>
+  <div class="row">
+    <button id="replay">처음부터 다시 보기</button>
+    <span class="lbl">P1에서 받은 유형</span>
+    <span id="types"></span>
+  </div>
+  <p id="gauge"></p>
+</div>
+
+<script>
+/* ── 목업 전용 ────────────────────────────────────────────────
+   P2 — 받은 유형을 확인하고 이름을 넣는 화면. 여기가 게임에 들어가는 문턱입니다.
+
+   ⭐ P1에서 그려진 엠블럼이 그대로 남습니다 — 화면이 바뀌었는데 엠블럼은
+      계속 있어서, 배정이 취소되거나 다시 굴러가지 않는다는 것이 눈으로 보입니다.
+   연출 — ① 엠블럼이 위로 올라가며 자리를 비움 0.3s
+          ② 아래에서 입력란이 그려지며 올라옴 0.3s
+          ③ 도트 커서 깜빡임(무한) ④ 글자는 칸 단위로 뚝뚝
+          ⑤ 「입장」을 누르면 한 프레임 번쩍 0.2s
+
+   이름 규칙(6.2 확정) — 최대 12자 · 공백 허용 · 숫자·이모지·특수문자는 막습니다.
+   ⛔ 색은 엠블럼에만. 입력란 밑줄·커서는 흰색입니다(5.2).                */
+
+const TYPES = [
+  {name:"CULTURE VANGUARD",      color:"var(--t0)"},
+  {name:"CREATIVE RISK-TAKERS",  color:"var(--t1)"},
+  {name:"RELENTLESS INNOVATORS", color:"var(--t2)"}
+];
+const EM_GRID = [
+  ["███████████","·█·······█·","·█·······█·","·█·██····█·","·█·██··█·█·","·█····██·█·",
+   "·█·█··██·█·","·█····██·█·","·█·······█·","·█···█···█·","·████·████·"],
+  ["███████████","█·········█","█·········█","█··█████··█","█·········█","█·········█",
+   "█·········█","█··█████··█","·█·······█·","··█·····█··","···█████···"],
+  ["····███····","··██···██··","·█·······█·","█··██·██··█","█··██·██··█","█·········█",
+   "█··██·██··█","█··██·██··█","·█·······█·","··██···██··","····███····"]
+];
+const MAXLEN = 12;                       /* 6.2 확정 */
+const T = {lift:300, form:300, flash:200};
+
+const $ = s => document.querySelector(s);
+const em = $("#em"), field = $("#field"), hidden = $("#hidden"), enter = $("#enter");
+let picked = 0, name = "", timers = [], blink = null, caretOn = true;
+const later = (ms,fn) => timers.push(setTimeout(fn, ms));
+
+function emblemSVG(t, px){
+  let r = "";
+  EM_GRID[t].forEach((row,y) => [...row].forEach((ch,x) => {
+    if(ch === "█") r += `<rect x="${x}" y="${y}" width="1" height="1" fill="${TYPES[t].color}"/>`;
+  }));
+  return `<svg width="${px}" height="${px}" viewBox="0 0 11 11" shape-rendering="crispEdges">${r}</svg>`;
+}
+
+/* 이름 규칙 — 한글·영문·공백만. 숫자·이모지·특수문자는 아예 안 들어갑니다 */
+function clean(s){
+  return [...s].filter(ch => /[가-힣ㄱ-ㅎㅏ-ㅣA-Za-z ]/.test(ch)).join("").slice(0, MAXLEN);
+}
+
+function paint(){
+  field.innerHTML = "";
+  if(!name.length){
+    const ph = document.createElement("span");
+    ph.className = "ph"; ph.textContent = "이름";
+    field.appendChild(ph);
+  }else{
+    [...name].forEach(ch => {
+      const s = document.createElement("span");
+      s.textContent = ch; field.appendChild(s);
+    });
+  }
+  const c = document.createElement("span");
+  c.className = "caret" + (caretOn ? "" : " off");
+  field.appendChild(c);
+  $("#count").textContent = `${name.length} / ${MAXLEN}`;
+  enter.className = name.length ? "on" : "";
+  gauge();
+}
+
+function run(){
+  timers.forEach(clearTimeout); timers = [];
+  clearInterval(blink);
+  name = ""; hidden.value = "";
+  em.innerHTML = emblemSVG(picked, parseInt(getComputedStyle(document.documentElement)
+                 .getPropertyValue("--empx")));
+  $("#hslot").innerHTML = emblemSVG(picked, 22);
+  $("#tname").textContent = TYPES[picked].name;
+  $("#form").style.visibility = "hidden";
+  $("#flash").style.display = "none";
+
+  /* ① 엠블럼이 위로 올라가며 자리를 비웁니다 — 여섯 칸으로 뚝뚝(5.3 steps) */
+  const wrap = document.querySelector(".emwrap");
+  const LIFT = 48, N = 6;
+  for(let i=0;i<=N;i++)
+    later(i * (T.lift/N), () => wrap.style.transform = `translateY(-${Math.round(i/N*LIFT)}px)`);
+
+  /* ② 입력란이 아래에서 한 칸씩 그려지며 올라옴 */
+  later(T.lift, () => { $("#form").style.visibility = "visible"; paint(); hidden.focus(); });
+
+  /* ③ 커서는 깜빡입니다 */
+  blink = setInterval(() => { caretOn = !caretOn; paint(); }, 500);
+  paint();
+}
+
+/* ④ 글자는 칸 단위로 뚝뚝 밀립니다 */
+hidden.addEventListener("input", () => {
+  name = clean(hidden.value);
+  hidden.value = name;
+  caretOn = true; paint();
+});
+document.querySelector(".phone").addEventListener("click", () => hidden.focus());
+
+/* ⑤ 입장 — 한 프레임 번쩍하고 전환. 목업에는 P3가 따로 있으므로 여기서 멈춥니다 */
+enter.onclick = () => {
+  if(!name.length) return;
+  $("#flash").style.display = "block";
+  later(T.flash*0.3, () => $("#flash").style.display = "none");
+  later(T.flash, () => alert("P3 대기 화면으로 넘어갑니다 (목업에서는 p3-wait.html)"));
+};
+
+function gauge(){
+  $("#gauge").textContent =
+    `폰 390×844 · 유형 ${TYPES[picked].name} · 엠블럼 `
+    + `${parseInt(getComputedStyle(document.documentElement).getPropertyValue("--empx"))}px`
+    + `(P1과 같은 크기) · 헤더 22px · 이름 ${name.length}/${MAXLEN}자`
+    + ` · 숫자·이모지·특수문자는 안 들어감 · 엠블럼 올라감 ${T.lift} + 입력란 ${T.form}ms`;
+}
+
+const typesBox = $("#types");
+TYPES.forEach((t,i) => {
+  const b = document.createElement("button");
+  b.textContent = t.name.split(" ")[0]; b.dataset.v = i;
+  b.setAttribute("aria-pressed", String(picked === i));
+  b.onclick = () => {
+    picked = i;
+    [...typesBox.children].forEach(x => x.setAttribute("aria-pressed", String(+x.dataset.v === i)));
+    run();
+  };
+  typesBox.appendChild(b);
+});
+$("#replay").onclick = run;
+
+function fit(){
+  const p = $("#phone");
+  const avail = innerHeight - document.querySelector(".ctl").offsetHeight - 40;
+  const s = Math.min(1, avail / 844);
+  p.style.transform = `scale(${s})`;
+  p.style.marginBottom = (844 * (s-1)) + "px";
+}
+addEventListener("resize", fit);
+
+const q = new URLSearchParams(location.search);
+if(["0","1","2"].includes(q.get("t"))) picked = +q.get("t");
+if(q.get("name")) { /* 스크린샷 확인용 — 이름이 들어간 상태로 띄웁니다 */ }
+[...typesBox.children].forEach(x => x.setAttribute("aria-pressed", String(+x.dataset.v === picked)));
+fit();
+run();
+if(q.get("name")) later(T.lift + 20, () => { name = clean(q.get("name")); hidden.value = name; paint(); });
+</script>
+
+<script src="bus.js"></script>
+</body>
+</html>
