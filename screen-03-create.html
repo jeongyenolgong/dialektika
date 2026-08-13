@@ -487,7 +487,7 @@ setup(startN > 0 ? Math.min(60, startN) : 30);
    9.2와 같은 판이고 **세는 것만** 다릅니다 — 쓴 문장 수, 그 단어로 만들어진 문장 수.
    ⛔ 여기서 쓰는 이름은 위 목업의 이름과 겹치면 안 됩니다
       (겹치면 이 블록이 통째로 안 돕니다 — 2026.08.13에 실제로 밟았습니다).  */
-let fromBook3 = false, bookCols3 = -1;
+let fromBook3 = false, bookCols3 = -1, settle3 = null;
 Bus.onState(b => {
   const named = (b.players || []).filter(p => p.name);
   if(!named.length && !fromBook3) return;
@@ -503,8 +503,11 @@ Bus.onState(b => {
   Object.entries(b.sents || {}).forEach(([w, v]) => hits[w] = {n:v.n || 0, at:v.at || 0});
 
   const cols = teams().length;
-  if(cols !== bookCols3){ bookCols3 = cols; buildBoard(cols); rank(true); }
-  else rank(false);
+  clearTimeout(settle3);
+  settle3 = setTimeout(() => {
+    if(cols !== bookCols3){ bookCols3 = cols; buildBoard(cols); }
+    rank(true);      /* 몰려 들어와도 판이 안 엉키게 모아서 한 번에 */
+  }, 700);
 });
 </script>
 </body>

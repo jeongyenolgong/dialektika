@@ -483,7 +483,7 @@ setup(startN > 0 ? Math.min(60, startN) : 30);
 /* ══ 장부에 사람이 있으면 그것이 진실입니다 ═══════════════════════════
    단어 순위 · 사람 순위 · 팀 순위 셋이 전부 여기서 나옵니다 (9.2).
    위 조작줄의 흉내는 장부가 비었을 때만 돕니다.                        */
-let fromBook = false, bookCols = -1;
+let fromBook = false, bookCols = -1, settle2 = null;
 Bus.onState(b => {
   const named = (b.players || []).filter(p => p.name);
   if(!named.length && !fromBook) return;
@@ -500,8 +500,11 @@ Bus.onState(b => {
 
   /* ⛔판을 다시 짜면 플랩이 끊깁니다 — 팀 수가 바뀔 때만 새로 짭니다 */
   const cols = teams().length;
-  if(cols !== bookCols){ bookCols = cols; buildBoard(cols); rank(true); }
-  else rank(false);        /* 개수만 올랐으면 판은 가만히 있습니다 (9.2) */
+  clearTimeout(settle2);
+  settle2 = setTimeout(() => {
+    if(cols !== bookCols){ bookCols = cols; buildBoard(cols); }
+    rank(true);      /* 몰려 들어와도 판이 안 엉키게 모아서 한 번에 */
+  }, 700);        /* 개수만 올랐으면 판은 가만히 있습니다 (9.2) */
 });
 </script>
 </body>

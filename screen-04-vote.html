@@ -322,5 +322,22 @@ setup(parseInt(q.get("n")) > 0 ? +q.get("n") : 30);
 </script>
 
 <script src="bus.js"></script>
+<script>
+/* ══ 장부가 진실입니다 — 득표 상위 문장 셋 (9.4) ══════════════════════
+   이름은 위 목업과 겹치면 안 됩니다 (겹치면 이 블록이 통째로 안 돕니다) */
+let fromBook4 = false, settle4 = null;
+Bus.onState(b => {
+  const S = b.sentences || [], W = b.wins || [];
+  if(!S.length && !fromBook4) return;
+  fromBook4 = true;
+  clearTimeout(timer);                         /* 흉내를 멈춥니다 */
+  votes = {};
+  S.forEach((x, i) => { if((W[i] || 0) > 0) votes[x.text] = {n:W[i], at:i}; });
+  /* ⛔표가 몰려 들어오면 갈아 끼우는 연출이 서로 겹쳐 판이 엉킵니다.
+     잦은 갱신은 모아 두었다가 잠잠해지면 한 번에 그립니다 (30명 동시 투표) */
+  clearTimeout(settle4);
+  settle4 = setTimeout(() => rank(true), 700);
+});
+</script>
 </body>
 </html>

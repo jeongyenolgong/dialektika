@@ -16,7 +16,7 @@
    화면 대응표(8.1)는 이 파일 한 곳에만 있다. 흩어 두면 어긋난다.
    ───────────────────────────────────────────────────────────────────────── */
 (() => {
-  const BUILD  = "260813-4";     /* 화면마다 조작줄에 뜹니다 — 폰이 옛 것을 물고 있는지 가릅니다 */
+  const BUILD  = "260813-5";     /* 화면마다 조작줄에 뜹니다 — 폰이 옛 것을 물고 있는지 가릅니다 */
   const K_BOOK = "dlk.book", K_SAY = "dlk.say";
   const ROOM   = new URLSearchParams(location.search).get("room") || "nolgong";
   const BROKER = "wss://broker.emqx.io:8084/mqtt";
@@ -72,7 +72,7 @@
     /* ⭐ 화면을 옮길 때 떨어지면 안 되는 값 둘.
        room — 떨어지면 그 기기만 다른 장부를 보게 된다
        t    — p3 대기가 유형을 잃으면 엠블럼이 바뀐다                        */
-    ["room", "t"].forEach(k => {
+    ["room", "t", "me"].forEach(k => {
       if (now.get(k) !== null && !url.searchParams.has(k)) url.searchParams.set(k, now.get(k));
     });
 
@@ -154,6 +154,9 @@
 
     /* 이 폰의 이름표. 새로고침해도 같은 사람으로 남는다 (재접속의 뿌리) */
     me() {
+      /* ?me= 로 박아 주면 한 노트북에서 여러 사람을 흉내 낼 수 있습니다 (검사용) */
+      const forced = new URLSearchParams(location.search).get("me");
+      if (forced) return forced;
       let id = localStorage.getItem("dlk.me");
       if (!id) { id = "p" + Math.random().toString(36).slice(2, 9); localStorage.setItem("dlk.me", id); }
       return id;
@@ -163,6 +166,8 @@
       const url = new URL(file, location.href);
       Object.entries(params || {}).forEach(([k, v]) => url.searchParams.set(k, v));
       if (ROOM !== "nolgong") url.searchParams.set("room", ROOM);
+      const forced = new URLSearchParams(location.search).get("me");
+      if (forced) url.searchParams.set("me", forced);
       location.replace(url.pathname.split("/").pop() + url.search);
     },
 

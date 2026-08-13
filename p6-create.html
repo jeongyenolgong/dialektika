@@ -210,7 +210,7 @@ const MOCK_CARDS = [
 ];
 function myCards(){
   try{
-    const mine = JSON.parse(localStorage.getItem("dlk.pairs") || "[]");
+    const mine = JSON.parse(localStorage.getItem("dlk.pairs." + Bus.me()) || "[]");
     if(mine.length) return mine.map(x => ({je:x.w, ban:x.m, s:""}));
   }catch(e){}
   return MOCK_CARDS;

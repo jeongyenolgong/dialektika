@@ -93,6 +93,7 @@
     color:var(--line); border:1px solid var(--line); padding:4px 8px; cursor:pointer}
   #gauge{opacity:.8}
 </style>
+<script src="bus.js"></script>
 </head>
 <body>
 
@@ -141,9 +142,9 @@ const EM_GRID = [
    "█··██·██··█","█··██·██··█","·█·······█·","··██···██··","····███····"]
 ];
 const TC = ["var(--t0)","var(--t1)","var(--t2)"];
-const MYTYPE = 1, ROUNDS = 12;
+let MYTYPE = 1, ROUNDS = 12;
 
-const POOL = [
+let POOL = [
   {je:"따뜻한 감수성", ban:"서늘한 이성", s:"따뜻한 감수성이 식으면 그 자리에 서늘한 이성만 남는다", by:"홍길동", t:0},
   {je:"빛", ban:"그늘", s:"빛이 강할수록 그늘도 깊어진다", by:"김서연", t:1},
   {je:"기존의 틀", ban:"새로운 시도", s:"기존의 틀을 깨는 손끝에서 새로운 시도가 시작된다", by:"박지훈", t:2},
@@ -153,19 +154,20 @@ const POOL = [
   {je:"응시", ban:"곁눈질", s:"응시가 길어질수록 곁눈질은 줄어든다", by:"윤서아", t:0},
   {je:"도전", ban:"안주", s:"도전을 멈춘 자리에 안주가 들어앉는다", by:"임재현", t:2}
 ];
-const MINE = [
+let MINE = [
   {je:"따뜻한 감수성", ban:"서늘한 이성", s:"따뜻한 감수성이 식으면 그 자리에 서늘한 이성만 남는다"},
   {je:"경계", ban:"연결", s:"경계를 지우면 연결이 남는다"},
   {je:"일상", ban:"사건", s:"일상이 오래 쌓이면 그 자체가 사건이 된다"}
 ];
-const MYPAIRS = [
+let MYPAIRS = [
   {je:"따뜻한 감수성", ban:"서늘한 이성"}, {je:"경계", ban:"연결"},
   {je:"일상", ban:"사건"}, {je:"응시", ban:"곁눈질"}
 ];
-const MYRANK = "30명 중 7위";
+let MYRANK = "30명 중 7위";
 
 const $ = s => document.querySelector(s);
 let round = 1, pair = [], timers = [], t0 = 0, spent = [], onP9 = false;
+let myDuels = null, pairIdx = null;   /* 장부에서 받은 내 대결 목록 */
 const later = (ms,fn) => timers.push(setTimeout(fn, ms));
 const clearAll = () => { timers.forEach(clearTimeout); timers = []; };
 
@@ -185,8 +187,15 @@ function markup(x){
 /* ── P8 ── */
 function deal(){
   onP9 = false;
-  const pool = [...POOL].sort(() => Math.random() - 0.5);
-  pair = [pool[0], pool[1]];
+  if(myDuels){                                  /* 진짜 판 — 진행자 화면이 짜 준 목록 */
+    const k = round - 1;
+    if(k >= myDuels.length) return done();
+    pairIdx = myDuels[k];
+    pair = pairIdx.map(cardOf);
+  }else{                                        /* 화면 혼자 확인할 때 */
+    const pool = [...POOL].sort(() => Math.random() - 0.5);
+    pair = [pool[0], pool[1]];
+  }
   t0 = performance.now();
   render8();
 }
@@ -217,6 +226,11 @@ function choose(i){
   const cards = [...document.querySelectorAll(".vcard")];
   cards.forEach(c => c.onclick = null);
   cards[i].classList.add("pick");
+  if(myDuels && pairIdx){                       /* 닿을 때까지 말합니다 */
+    const k = round - 1;
+    Bus.sayUntil({vote:{id:Bus.me(), k, win:pairIdx[i]}},
+                 b => ((Bus.mine(b) || {}).votes || 0) > k);
+  }
   later(HOLD, () => cards.forEach(c => c.classList.add("gone")));
   later(HOLD + FADE, () => {
     if(round >= ROUNDS){ done(); return; }
@@ -304,9 +318,47 @@ addEventListener("resize", fit);
 fit();
 deal();
 const q = new URLSearchParams(location.search);
-if(q.get("v") === "9") later(60, render9);
+/* ── 장부에 붙습니다 ────────────────────────────────────────────── */
+const wantP9 = q.get("v") === "9";
+let p9done = false, live8 = false;
+function goP9(){ if(p9done) return; p9done = true; render9(); }
+function cardOf(i){
+  const S = (Bus.state().sentences || [])[i] || {};
+  return {je:S.word || "", ban:S.pair || "", s:S.text || "", by:S.name || "", t:S.t || 0};
+}
+Bus.onState(b => {
+  const me = Bus.mine(b);
+  if(!me) return;
+  MYTYPE = me.type;
+  $("#hslot").innerHTML = emblem(MYTYPE, 22);
+
+  /* 서랍은 내가 모은 쌍입니다 */
+  try{
+    const mine = JSON.parse(localStorage.getItem("dlk.pairs." + Bus.me()) || "[]");
+    if(mine.length) MYPAIRS = mine.map(x => ({je:x.w, ban:x.m}));
+  }catch(e){}
+
+  /* P9 재료 — 내 문장을 득표순으로, 그리고 내 순위 */
+  const S = b.sentences || [], W = b.wins || [];
+  const mineS = S.map((x,i) => ({i, x, n:W[i] || 0})).filter(o => o.x.by === Bus.me())
+                 .sort((a,c) => c.n - a.n);
+  if(mineS.length) MINE = mineS.map(o => cardOf(o.i));
+  const sorted = (b.players || []).filter(p => p.name).sort((x,y) => (y.score||0) - (x.score||0));
+  const no = sorted.findIndex(p => (p.score||0) === (me.score||0)) + 1;
+  if(sorted.length) MYRANK = `${sorted.length}명 중 ${no || 1}위`;
+
+  if(wantP9){ goP9(); return; }
+
+  /* P8 — 내 대결 목록이 오면 그때 시작합니다 */
+  const d = (b.duels || {})[Bus.me()];
+  if(d && d.length && !live8){
+    live8 = true; myDuels = d; ROUNDS = d.length;
+    round = Math.min(d.length, (me.votes || 0) + 1);
+    deal();
+  }
+});
+if(wantP9) later(3000, goP9);            /* 장부가 안 와도 화면은 뜹니다 */
 </script>
 
-<script src="bus.js"></script>
 </body>
 </html>

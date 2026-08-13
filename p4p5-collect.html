@@ -438,7 +438,7 @@ $("#ent").onclick = () => {
   Bus.sayUntil({pair:{id:Bus.me(), code:cur.c, word:cur.w, mine}},
                b => ((Bus.mine(b) || {}).got || 0) >= nth);
   /* 폰 안에도 적어 둡니다 — P6가 이 쌍으로 카드를 만듭니다 (6.4 ⑦) */
-  localStorage.setItem("dlk.pairs", JSON.stringify(pairs));
+  localStorage.setItem("dlk.pairs." + Bus.me(), JSON.stringify(pairs));
   const fly = $("#fly"), mid = $("#v5mid"), kb = $("#kb");
   const main = document.querySelector("main");
   const W = main.clientWidth, H = main.clientHeight;

@@ -456,7 +456,10 @@ function runCreate(){
    손잡이(짧게·보통·길게)가 그 길이를 늘리고 줄입니다 */
 function runVote(){
   voteStarted = true;
-  people.forEach(p => later(() => { p.voted = true; bump(p); },
+  buildDuels();                                  /* 짝을 다 짜서 장부에 올립니다 */
+  /* 흉내 인원만 저절로 끝냅니다 — 진짜 사람은 폰에서 실제로 투표합니다 */
+  people.filter(p => p.id.startsWith("mock"))
+        .forEach(p => later(() => { p.voted = true; bump(p); sync(); },
                             (3000 + Math.random()*13000) * voteLen));
 }
 
@@ -552,7 +555,7 @@ function gauge(){
 }
 
 function run(target){
-  clearAll(); people = []; words = {}; sents = {}; sentences = []; seq = 0; stage = "entry"; press = 0; noted = ""; voteStarted = false; draw();
+  clearAll(); people = []; words = {}; sents = {}; sentences = []; wins = []; duels = {}; ballots = {}; seq = 0; stage = "entry"; press = 0; noted = ""; voteStarted = false; draw();
   if(booted) Bus.publish({press:0, players:[]});   /* 프리셋을 다시 누르면 판 전체가 처음으로 */
   document.querySelectorAll("#btns button").forEach(b =>
     b.setAttribute("aria-pressed", String(+b.dataset.n === target)));
@@ -576,9 +579,10 @@ function sync(){
   Bus.publish({
     players: people.map(p => ({
       id:p.id, name:p.named ? p.name : "", type:TYPES.indexOf(p.type), code:p.code,
-      idxInType:p.idxInType, got:p.pairs, sent:p.sentences, at:p.at || 0
+      idxInType:p.idxInType, got:p.pairs, sent:p.sentences, at:p.at || 0,
+      voted:!!p.voted, score:scoreOf(p.id), votes:Object.keys(ballots[p.id] || {}).length
     })),
-    words, sents, sentences
+    words, sents, sentences, duels, wins
   });
 }
 
@@ -592,14 +596,76 @@ function pairReal(id, word){
   bump(p); sync();
 }
 
+/* ══ 투표 ═══════════════════════════════════════════════════════════
+   짝은 진행자 화면이 미리 다 짜서 장부에 올립니다. 폰은 자기 목록을 걸어갈
+   뿐입니다 — 그래야 말 한 마디가 사라져도 대결이 없어지지 않습니다 (7.4).  */
+let wins = [], duels = {}, ballots = {};
+
+/* 이 사람이 어느 열(팀)인가 — 5.5로 갈린 열까지 셉니다 */
+function colOf(p){ return layout().findIndex(c => c.members.includes(p)); }
+
+/* ⭐ 개인 점수 셈법은 이 함수 하나뿐입니다 (7.5).
+      승률로 바꾸려면 여기만 갈아 끼웁니다 — 팀 평균과 나머지는 그대로입니다 */
+function scoreOf(id){
+  return sentences.reduce((n,x,i) => n + (x.by === id ? (wins[i] || 0) : 0), 0);
+}
+
+function buildDuels(){
+  wins = sentences.map(() => 0);
+  duels = {}; ballots = {};
+  const shows = sentences.map(() => 0);
+  const ppl = people.filter(p => p.named);
+  const expose = Math.max(2, Math.round(6 * voteLen));   /* 문장 한 편이 뜨는 횟수 (7.4) */
+  ppl.forEach(p => duels[p.id] = []);
+  if(sentences.length < 2 || ppl.length < 2){ sync(); return; }
+
+  const col = {};                                        /* 문장 → 작성자의 열 */
+  sentences.forEach((x,i) => {
+    const a = people.find(q => q.id === x.by); col[i] = a ? colOf(a) : -1;
+  });
+  const per = Math.max(1, Math.ceil(sentences.length * expose / (2 * ppl.length)));
+
+  for(let r = 0; r < per; r++){
+    ppl.forEach(p => {
+      const mine = colOf(p);
+      /* 내 문장도 우리 팀 문장도 뺍니다 (7.4) */
+      const cand = sentences.map((_,i) => i)
+        .filter(i => sentences[i].by !== p.id && col[i] !== mine)
+        .sort((a,b) => shows[a] - shows[b] || a - b);   /* 가장 적게 뜬 것부터 */
+      const a = cand[0];
+      if(a === undefined) return;
+      /* 같은 사람의 두 편은 서로 안 붙입니다 */
+      const b = cand.find(i => i !== a && sentences[i].by !== sentences[a].by);
+      if(b === undefined) return;
+      shows[a]++; shows[b]++;
+      duels[p.id].push([a, b]);
+    });
+  }
+  noted = `대결 ${Object.values(duels).reduce((n,d) => n+d.length, 0)}판 · 1인당 ${per}판`;
+  sync();
+}
+
+function voteReal(id, k, win){
+  const p = people.find(q => q.id === id);
+  if(!p) return;
+  const box = ballots[id] || (ballots[id] = {});
+  if(box[k] !== undefined) return;              /* 같은 대결을 두 번 세지 않습니다 */
+  box[k] = win;
+  wins[win] = (wins[win] || 0) + 1;
+  p.at = ++seq;
+  const need = (duels[id] || []).length;
+  p.voted = need > 0 && Object.keys(box).length >= need;
+  bump(p); sync();
+}
+
 /* 폰이 문장 한 편을 제출할 때마다 */
-function sentReal(id, word, text){
+function sentReal(id, word, pair, text){
   const p = people.find(q => q.id === id);
   if(!p) return;
   p.sentences++; p.at = ++seq;
   const w = sents[word] || (sents[word] = {n:0, at:0});
   w.n++; w.at = seq;
-  sentences.push({by:id, word, text});
+  sentences.push({by:id, name:p.name, t:TYPES.indexOf(p.type), word, pair, text});
   bump(p); sync();
 }
 
@@ -628,7 +694,8 @@ Bus.onSay(msg => {
   if(msg.join) joinReal(msg.join.id);
   if(msg.name) nameReal(msg.name.id, msg.name.name);
   if(msg.pair) pairReal(msg.pair.id, msg.pair.word);
-  if(msg.sentence) sentReal(msg.sentence.id, msg.sentence.word, msg.sentence.text);
+  if(msg.sentence) sentReal(msg.sentence.id, msg.sentence.word, msg.sentence.pair, msg.sentence.text);
+  if(msg.vote) voteReal(msg.vote.id, msg.vote.k, msg.vote.win);
 });
 
 /* ⛔ 진행자가 실수로 새로고침해도 판이 날아가면 안 됩니다.
@@ -649,6 +716,8 @@ Bus.onState(b => {
     words = b.words || {};
     sents = b.sents || {};
     sentences = b.sentences || [];
+    wins = b.wins || []; duels = b.duels || {};
+    people.forEach(q => q.voted = (b.players.find(x => x.id === q.id) || {}).voted);
     seq = Math.max(0, ...people.map(p => p.at || 0));
     press = b.press || 0;
     stage = press < PRESSES.length ? PRESSES[press].at : "result";

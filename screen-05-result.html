@@ -328,5 +328,23 @@ setup(parseInt(q.get("n")) > 0 ? +q.get("n") : 30);
 </script>
 
 <script src="bus.js"></script>
+<script>
+/* ══ 장부가 진실입니다 — 우승 팀 · 최다 득표 3위 · 문장 순위 (9.5) ═════ */
+let fromBook5 = false;
+Bus.onState(b => {
+  const P = (b.players || []).filter(p => p.name);
+  const S = b.sentences || [], W = b.wins || [];
+  if(!P.length && !fromBook5) return;
+  fromBook5 = true;
+
+  people = P.map(p => ({name:p.name, type:p.type, idxInType:p.idxInType || 0,
+                        score:p.score || 0, id:p.id}));
+  N = people.length;
+  works = S.map((x, i) => ({text:x.text, n:W[i] || 0,
+                            by:people.find(q => q.id === x.by) || {name:x.name, type:x.t, idxInType:0, score:0}}))
+           .sort((a, c) => c.n - a.n);
+  render();
+});
+</script>
 </body>
 </html>
