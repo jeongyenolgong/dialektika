@@ -1,27 +1,26 @@
 /* ─────────────────────────────────────────────────────────────────────────
    bus.js — 모두가 같은 장부 한 권을 본다
 
-   장부에 적히는 것은 지금 **「다음」을 몇 번 눌렀나** 하나뿐이다 (0 ~ 7).
-   진행자가 「다음」을 누르면 장부가 바뀌고, 그 장부를 보고 있는 모든 기기가
-   제 자리에 맞는 화면으로 옮겨 간다.
+   **장부(book)** — 지금 판의 전부. 진행자 화면만 적고, 나머지는 읽기만 한다.
+       { press: 0~7, players: [ {id, name, type, code} ] }
+   **말(say)** — 스쳐 지나가는 한마디. 누구나 보낸다. 장부에 남지 않는다.
+       {join:{id}} · {name:{id, name}}
+   폰은 「나를 넣어 주세요」라고 말하고, **진행자 화면이 받아 적어 장부에 올린다.**
+   유형 배정과 개인 코드가 한 곳에서 나와야 팀이 고르게 갈린다 (SSOT 2.1 · 5.5).
 
-   ⭐ 장부를 어디에 두느냐가 셋이고, **스스로 고른다.**
+   ⭐ 장부를 어디에 두느냐가 셋이고 **스스로 고른다** (SSOT 2.4)
+     ① 노트북       `server.py`가 켜져 있을 때. 인터넷 없이 돈다. 워크숍 당일용
+     ② 인터넷 중계   그 밖의 모든 경우. 각자 어디서 접속하든, LTE여도 된다
+     ③ 혼자         둘 다 안 닿을 때. 브라우저 한 대 안에서만
 
-     ① 노트북       `server.py`가 켜져 있으면 그 노트북이 장부를 든다.
-                    인터넷이 없어도 돌아간다. **워크숍 당일에 쓰는 길이다.**
-                    폰은 노트북과 같은 와이파이여야 한다.
-     ② 인터넷 중계   그 밖의 모든 경우(깃헙 링크 포함). 각자 어디서 접속하든,
-                    **누가 LTE를 쓰든 상관없다.** 계정도 가입도 없다.
-     ③ 혼자         둘 다 닿지 않을 때. 브라우저 한 대 안에서만 돈다.
-
-   대응표는 SSOT 8.1 「다음 여섯 번과 종료 한 번」을 그대로 옮긴 것이고,
-   **이 파일 한 곳에만 있다.** 화면마다 흩어 두면 어긋난다.
+   화면 대응표(8.1)는 이 파일 한 곳에만 있다. 흩어 두면 어긋난다.
    ───────────────────────────────────────────────────────────────────────── */
 (() => {
-  const KEY    = "dlk.press";
+  const K_BOOK = "dlk.book", K_SAY = "dlk.say";
   const ROOM   = new URLSearchParams(location.search).get("room") || "nolgong";
-  const TOPIC  = `dialektika/${ROOM}/state`;
   const BROKER = "wss://broker.emqx.io:8084/mqtt";
+  const T_BOOK = `dialektika/${ROOM}/book`;
+  const T_SAY  = `dialektika/${ROOM}/say`;
 
   /* SSOT 8.1 표 — 누름 0(아직 안 누름) ~ 7(종료) */
   const SCREEN = [
@@ -53,9 +52,9 @@
     : /^p\d/.test(here)           ? "phone"
     : null;
 
-  const subs  = [];
-  let   press = 0;
-  let   mode  = "찾는 중";
+  let book = { press: 0, players: [] };
+  const onBook = [], onPress = [], onSay = [];
+  let mode = "찾는 중";
 
   /* ── 내 자리에서 지금 눌림 수에 맞는 화면으로 옮긴다 ───────────────── */
   function follow(n) {
@@ -68,7 +67,7 @@
     const url = new URL(target, location.href);
 
     /* ⭐ 화면을 옮길 때 떨어지면 안 되는 값 둘.
-       room — 떨어지면 그 기기만 다른 장부를 보게 된다 (테스트 판이 갈린다)
+       room — 떨어지면 그 기기만 다른 장부를 보게 된다
        t    — p3 대기가 유형을 잃으면 엠블럼이 바뀐다                        */
     ["room", "t"].forEach(k => {
       if (now.get(k) !== null && !url.searchParams.has(k)) url.searchParams.set(k, now.get(k));
@@ -85,42 +84,77 @@
     location.replace(file + url.search);
   }
 
-  function arrive(next) {
-    if (!next || typeof next.press !== "number" || next.press === press) return;
-    press = next.press;
-    subs.forEach(fn => fn(press));
-    follow(press);
+  function gotBook(next) {
+    if (!next || typeof next !== "object") return;
+    const before = book.press;
+    book = { press: 0, players: [], ...next };
+    onBook.forEach(fn => fn(book));
+    if (book.press !== before) {
+      onPress.forEach(fn => fn(book.press));
+      follow(book.press);
+    }
   }
+  const gotSay = msg => onSay.forEach(fn => fn(msg));
 
-  /* ── 밖으로 내보내는 통로. 길이 정해지기 전에 누르면 담아 뒀다 보낸다 ── */
-  let send = null;
+  /* ── 밖으로 내보내는 통로. 길이 정해지기 전에 부르면 담아 뒀다 보낸다 ── */
+  let out = null;
   const waiting = [];
-  const settle = (name, fn) => {
-    mode = name; send = fn;
-    waiting.splice(0).forEach(fn);
-    subs.forEach(s => s(press));
+  const settle = (name, channel) => {
+    mode = name; out = channel;
+    waiting.splice(0).forEach(([kind, data]) => out[kind](data));
+    onBook.forEach(fn => fn(book));            /* 길이 정해졌으니 화면에 지금 판을 한 번 준다 */
   };
+  const push = (kind, data) => out ? out[kind](data) : waiting.push([kind, data]);
 
   window.Bus = {
-    press: () => press,
-    /* 진행자 화면이 「다음」을 누를 때 부른다 */
-    set(n) {
-      press = n;
-      subs.forEach(fn => fn(n));
-      const packet = { press: n };
-      send ? send(packet) : waiting.push(packet);
+    /* 읽기 */
+    state:  () => book,
+    press:  () => book.press,
+    players: () => book.players || [],
+    mode:   () => mode,
+    room:   ROOM,
+    role,
+
+    /* 적기 — 진행자 화면만 */
+    publish(patch) {
+      book = { ...book, ...patch };
+      onBook.forEach(fn => fn(book));
+      push("book", book);
     },
-    onChange(fn) { subs.push(fn); },
-    /* 「스크린」 버튼이 새 창을 열 때 쓴다 — room을 떨어뜨리면 그 창만 다른 장부를 본다 */
+    set(n) {                                   /* 「다음」 — press만 바꾸는 짧은 이름 */
+      const before = book.press;
+      this.publish({ press: n });
+      if (n !== before) onPress.forEach(fn => fn(n));
+    },
+
+    /* 한마디 — 누구나 */
+    say(msg) { push("say", msg); },
+
+    /* 듣기 */
+    onState(fn)  { onBook.push(fn); if (mode !== "찾는 중") fn(book); },
+    onChange(fn) { onPress.push(fn); },
+    onSay(fn)    { onSay.push(fn); },
+
+    /* 이 폰의 이름표. 새로고침해도 같은 사람으로 남는다 (재접속의 뿌리) */
+    me() {
+      let id = localStorage.getItem("dlk.me");
+      if (!id) { id = "p" + Math.random().toString(36).slice(2, 9); localStorage.setItem("dlk.me", id); }
+      return id;
+    },
+    /* 화면을 옮긴다 — room을 떨어뜨리지 않는 유일한 통로 */
+    go(file, params) {
+      const url = new URL(file, location.href);
+      Object.entries(params || {}).forEach(([k, v]) => url.searchParams.set(k, v));
+      if (ROOM !== "nolgong") url.searchParams.set("room", ROOM);
+      location.replace(url.pathname.split("/").pop() + url.search);
+    },
+
+    /* 「스크린」 버튼이 새 창을 열 때 — room을 떨어뜨리면 그 창만 다른 장부를 본다 */
     screenAt(n) {
       const url = new URL(SCREEN[n] || SCREEN[0], location.href);
-      const room = new URLSearchParams(location.search).get("room");
-      if (room) url.searchParams.set("room", room);
+      if (ROOM !== "nolgong") url.searchParams.set("room", ROOM);
       return url.pathname.split("/").pop() + url.search;
     },
-    mode: () => mode,
-    room: ROOM,
-    role,
   };
 
   /* ── ① 노트북 (server.py) ────────────────────────────────────────── */
@@ -132,12 +166,18 @@
       let first = true;
       es.onmessage = e => {
         clearTimeout(giveUp);
-        try { arrive(JSON.parse(e.data)); } catch (err) {}
-        if (first) { first = false; ok(); }       /* 장부가 한 번 왔으면 이 길이 살아 있다 */
+        let env; try { env = JSON.parse(e.data); } catch (err) { return; }
+        if (env.book) gotBook(env.book);
+        if (env.say)  gotSay(env.say);
+        if (first) { first = false; ok(); }
       };
       es.onerror = () => { if (first) { clearTimeout(giveUp); es.close(); no(); } };
     });
   }
+  const laptopChannel = {
+    book: b => fetch("book", { method: "POST", body: JSON.stringify(b) }),
+    say:  m => fetch("say",  { method: "POST", body: JSON.stringify(m) }),
+  };
 
   /* ── ② 인터넷 중계 (계정 없이 쓰는 공개 중계기) ───────────────────── */
   function loadMqtt() {
@@ -158,27 +198,39 @@
       const giveUp = setTimeout(() => { c.end(true); no(); }, 12000);
       c.on("connect", () => {
         clearTimeout(giveUp);
-        c.subscribe(TOPIC, { qos: 0 });
-        /* 남겨 두고 보내므로(retain) 늦게 들어온 폰도 지금 판을 곧바로 받는다 */
-        ok(packet => c.publish(TOPIC, JSON.stringify(packet), { qos: 0, retain: true }));
+        c.subscribe([T_BOOK, T_SAY], { qos: 0 });
+        ok({
+          /* 남겨 두고 보내므로(retain) 늦게 들어온 폰도 지금 판을 곧바로 받는다 */
+          book: b => c.publish(T_BOOK, JSON.stringify(b), { qos: 0, retain: true }),
+          say:  m => c.publish(T_SAY,  JSON.stringify(m), { qos: 0 }),
+        });
       });
-      c.on("message", (_, buf) => { try { arrive(JSON.parse(buf.toString())); } catch (e) {} });
+      c.on("message", (topic, buf) => {
+        let d; try { d = JSON.parse(buf.toString()); } catch (e) { return; }
+        topic === T_BOOK ? gotBook(d) : gotSay(d);
+      });
       c.on("error", () => {});
     }));
   }
 
   /* ── ③ 혼자 — 브라우저 한 대 안에서만 ────────────────────────────── */
   function alone() {
-    const read = () => { const v = parseInt(localStorage.getItem(KEY), 10); return isNaN(v) ? 0 : v; };
-    addEventListener("storage", e => { if (e.key === KEY) arrive({ press: read() }); });
-    press = read();
-    settle("혼자", p => localStorage.setItem(KEY, String(p.press)));
-    follow(press);
+    addEventListener("storage", e => {
+      if (e.key === K_BOOK && e.newValue) { try { gotBook(JSON.parse(e.newValue)); } catch (x) {} }
+      if (e.key === K_SAY  && e.newValue) { try { gotSay(JSON.parse(e.newValue).msg); } catch (x) {} }
+    });
+    try { gotBook(JSON.parse(localStorage.getItem(K_BOOK))); } catch (e) {}
+    settle("혼자", {
+      book: b => localStorage.setItem(K_BOOK, JSON.stringify(b)),
+      /* 같은 값을 두 번 넣으면 storage 이벤트가 안 뜨므로 번호를 붙인다 */
+      say:  m => localStorage.setItem(K_SAY, JSON.stringify({ n: Math.random(), msg: m })),
+    });
+    follow(book.press);
   }
 
   tryLaptop()
-    .then(() => settle("노트북", p => fetch("state", { method: "POST", body: JSON.stringify(p) })))
+    .then(() => settle("노트북", laptopChannel))
     .catch(() => tryRelay()
-      .then(pub => settle("인터넷 중계", pub))
+      .then(ch => settle("인터넷 중계", ch))
       .catch(() => alone()));
 })();

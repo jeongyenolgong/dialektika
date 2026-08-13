@@ -78,6 +78,7 @@
   .ctl button[aria-pressed="true"]{background:var(--name); color:var(--bg-2); border-color:var(--name)}
   #gauge{opacity:.8}
 </style>
+<script src="bus.js"></script>
 </head>
 <body>
 
@@ -221,7 +222,8 @@ enter.onclick = () => {
   if(!name.length) return;
   $("#flash").style.display = "block";
   later(T.flash*0.3, () => $("#flash").style.display = "none");
-  later(T.flash, () => alert("P3 대기 화면으로 넘어갑니다 (목업에서는 p3-wait.html)"));
+  Bus.say({name:{id:Bus.me(), name}});   /* 진행자 화면이 받아 적어 장부에 올립니다 */
+  later(T.flash, () => Bus.go("p3-wait.html", {t:picked}));
 };
 
 function gauge(){
@@ -264,6 +266,5 @@ run();
 if(q.get("name")) later(T.lift + 20, () => { name = clean(q.get("name")); hidden.value = name; paint(); });
 </script>
 
-<script src="bus.js"></script>
 </body>
 </html>

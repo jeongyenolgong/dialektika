@@ -96,6 +96,7 @@
   .ctl button[aria-pressed="true"]{background:var(--name); color:var(--bg-2); border-color:var(--name)}
   #gauge{opacity:.8}
 </style>
+<script src="bus.js"></script>
 </head>
 <body>
 
@@ -387,7 +388,7 @@ const msBox = $("#scanms"), nBox = $("#scann");
 });
 
 $("#replay").onclick = run;
-next.onclick = run;      /* 목업에서는 P2가 없으므로 처음으로 돌아갑니다 */
+next.onclick = () => Bus.go("p2-name.html", {t:picked});
 
 /* 창이 작으면 폰을 통째로 줄여 보여 줍니다 — 안의 크기는 그대로입니다 */
 function fit(){
@@ -409,9 +410,35 @@ if(+q.get("scans") > 0) SCANS = +q.get("scans");
 [...msBox.children].forEach(x => x.setAttribute("aria-pressed", String(+x.dataset.ms === T.scan)));
 [...nBox.children].forEach(x => x.setAttribute("aria-pressed", String(+x.dataset.n === SCANS)));
 fit();
-run();
+
+/* ══ 유형은 진행자 화면이 배정합니다 (SSOT 2.1 · 6.1) ══════════════════
+   폰이 스스로 뽑으면 팀이 고르게 갈리지 않습니다. 「나를 넣어 주세요」라고
+   말하고, 장부에 내 자리가 생기면 그때 연출을 시작합니다.
+   ⛔진행자 화면이 안 열려 있으면 배정이 안 됩니다 — 그동안 기다립니다.  */
+const ME = Bus.me();
+let started = false;
+
+function startWith(t){
+  if(started) return;
+  started = true;
+  FIXED = t;                       /* deal()이 이 값을 그대로 씁니다 */
+  center.textContent = "";
+  run();
+}
+
+if(FIXED !== null){                /* 주소로 유형을 박아 준 경우는 그대로 (확인용) */
+  startWith(FIXED);
+}else{
+  center.textContent = "진행자를 기다리는 중";
+  const knock = () => { if(!started) Bus.say({join:{id:ME}}); };
+  Bus.onState(b => {
+    const mine = (b.players || []).find(p => p.id === ME);
+    if(mine) startWith(mine.type);
+  });
+  knock();
+  setInterval(knock, 2000);        /* 진행자 화면이 늦게 열려도 들어간다 */
+}
 </script>
 
-<script src="bus.js"></script>
 </body>
 </html>

@@ -272,5 +272,26 @@ render(startN > 0 ? Math.min(60, startN) : 33);
 </script>
 
 <script src="bus.js"></script>
+<script>
+/* ══ 장부에 사람이 있으면 그것이 진실입니다 ═══════════════════════════
+   9.1은 이름만 보입니다 — 아직 이름을 안 넣은 사람은 뜨지 않습니다.
+   위 프리셋 버튼은 장부가 비었을 때만 살아 있는 흉내입니다.          */
+let liveNames = [];
+Bus.onState(b => {
+  const named = (b.players || []).filter(p => p.name);
+  if(!named.length && !liveNames.length) return;    /* 장부가 비어 있으면 흉내를 그대로 둔다 */
+
+  const fresh = named.map(p => p.name).filter(n => !liveNames.includes(n));
+  liveNames = named.map(p => p.name);
+
+  clearTimeout(timer);                              /* 흉내를 멈춘다 */
+  people = [];
+  named.forEach(p => {
+    const t = TYPES[p.type] || TYPES[0];
+    people.push({name:p.name, type:t, idxInType:people.filter(q => q.type === t).length});
+  });
+  draw(fresh.length === 1 ? fresh[0] : null);       /* 한 명만 새로 들어왔으면 그 줄만 밝힌다 */
+});
+</script>
 </body>
 </html>

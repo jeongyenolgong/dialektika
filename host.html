@@ -400,7 +400,7 @@ function arrive(i){
   const goal = i === 5 ? 0                        /* 한 명은 한 쌍도 못 모읍니다 (0/0) */
              : slow ? 2 + Math.floor(rnd(i)*3)    /* 2~4 */
                     : 3 + Math.floor(rnd(i)*5);   /* 3~7 */
-  const p = {name:nameAt(i), code:codeAt(i), type,
+  const p = {id:"mock"+i, name:nameAt(i), code:codeAt(i), type,
              idxInType:people.filter(q => q.type === type).length,
              named:false, pairs:0, sentences:0, goal,
              /* 한 명은 쌍이 있는데 한 편도 안 씁니다 (0/4) */
@@ -411,9 +411,11 @@ function arrive(i){
   if(h){ h.textContent = people.length;
          h.classList.remove("tick"); void h.offsetWidth; h.classList.add("tick"); }
 
+  sync();
   const before = layout().length;
   later(() => {
     p.named = true;
+    sync();
     if(layout().length !== before) return draw();  /* 열이 갈리면 판을 다시 그린다 */
     const cols = layout();
     const ci = cols.findIndex(c => c.members.includes(p));
@@ -551,7 +553,7 @@ function gauge(){
 
 function run(target){
   clearAll(); people = []; stage = "entry"; press = 0; noted = ""; voteStarted = false; draw();
-  Bus.set(0);                                     /* 인원 프리셋을 다시 누르면 창 셋이 함께 처음으로 */
+  if(booted) Bus.publish({press:0, players:[]});   /* 프리셋을 다시 누르면 판 전체가 처음으로 */
   document.querySelectorAll("#btns button").forEach(b =>
     b.setAttribute("aria-pressed", String(+b.dataset.n === target)));
   let i = 0;
@@ -561,6 +563,65 @@ function run(target){
     later(step, 120 + Math.random()*260);
   })();
 }
+
+/* ══ 장부의 주인 ═══════════════════════════════════════════════════════
+   폰은 「나를 넣어 주세요」라고 말할 뿐이고, 유형과 개인 코드는 여기서 나옵니다.
+   한 곳에서 나와야 접속 순서대로 고르게 갈립니다 (6.1 · 5.5).             */
+function sync(){
+  Bus.publish({players: people.map(p => ({
+    id:p.id, name:p.named ? p.name : "", type:TYPES.indexOf(p.type), code:p.code
+  }))});
+}
+
+function joinReal(id){
+  if(people.some(p => p.id === id)) return;       /* 새로고침해도 두 번 들어오지 않는다 */
+  const i = people.length;
+  const type = TYPES[i % 3];                      /* 6.1 — 접속 순서대로 균등 배정 */
+  people.push({id, name:"", code:codeAt(i), type,
+               idxInType:people.filter(q => q.type === type).length,
+               named:false, pairs:0, sentences:0, goal:0, writeGoal:0});
+  const h = document.getElementById("heroN");
+  if(h){ h.textContent = people.length;
+         h.classList.remove("tick"); void h.offsetWidth; h.classList.add("tick"); }
+  sync(); draw(); gauge();
+}
+
+function nameReal(id, name){
+  const p = people.find(q => q.id === id);
+  if(!p) return;
+  p.name = name; p.named = true;
+  sync(); draw(); gauge();
+}
+
+Bus.onSay(msg => {
+  if(!msg) return;
+  if(msg.join) joinReal(msg.join.id);
+  if(msg.name) nameReal(msg.name.id, msg.name.name);
+});
+
+/* ⛔ 진행자가 실수로 새로고침해도 판이 날아가면 안 됩니다.
+      장부에 이미 사람이 있으면 **그것을 이어받고**, 비어 있을 때만 새로 엽니다.
+      그래서 첫 장부를 보기 전에는 아무것도 적지 않습니다.                  */
+let booted = false;
+Bus.onState(b => {
+  if(booted) return;
+  booted = true;
+  if(b.players && b.players.length){
+    people = b.players.map(p => {
+      const type = TYPES[p.type] || TYPES[0];
+      return {id:p.id, name:p.name, code:p.code, type, named:!!p.name,
+              idxInType:0, pairs:0, sentences:0, goal:0, writeGoal:0};
+    });
+    TYPES.forEach(t => people.filter(p => p.type === t).forEach((p,k) => p.idxInType = k));
+    press = b.press || 0;
+    stage = press < PRESSES.length ? PRESSES[press].at : "result";
+    voteStarted = press >= 5;
+    noted = `장부를 이어받음 · ${people.length}명`;
+    draw(); gauge();
+  }else{
+    Bus.publish({press:0, players:[]});
+  }
+});
 
 const PRESETS = [{n:0,why:"시작 전"},{n:12,why:"들어오는 중"},{n:28,why:"3팀"},
                  {n:30,why:"3팀 꽉"},{n:31,why:"4팀"}];
@@ -573,7 +634,7 @@ PRESETS.forEach(p => {
 });
 addEventListener("resize", gauge);
 const startN = parseInt(new URLSearchParams(location.search).get("n"));
-run(isNaN(startN) ? 28 : Math.min(60, startN));
+run(isNaN(startN) ? 0 : Math.min(60, startN));   /* 빈 판으로 시작 — 흉내는 아래 조작줄에서 */
 </script>
 
 </body>

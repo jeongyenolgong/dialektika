@@ -16,14 +16,14 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 PORT = 8000
 ROOT = os.path.dirname(os.path.abspath(__file__))
 
-# 장부 — 지금 적히는 것은 「다음」을 몇 번 눌렀나 하나뿐입니다 (bus.js와 같은 값)
-state = {"press": 0}
+# 장부 — 지금 판의 전부입니다 (bus.js의 book과 같은 것)
+book = {"press": 0, "players": []}
 lock = threading.Lock()
 listeners = []                      # 접속해 있는 기기마다 편지함 하나
 
 
-def broadcast():
-    line = json.dumps(state, ensure_ascii=False)
+def broadcast(envelope):
+    line = json.dumps(envelope, ensure_ascii=False)
     for box in list(listeners):
         box.put(line)
 
@@ -47,7 +47,7 @@ class Handler(SimpleHTTPRequestHandler):
         path = self.path.split("?")[0]
 
         if path == "/state":                      # 장부를 한 번 읽어 간다
-            body = json.dumps(state, ensure_ascii=False).encode("utf-8")
+            body = json.dumps(book, ensure_ascii=False).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
@@ -68,7 +68,8 @@ class Handler(SimpleHTTPRequestHandler):
         box = queue.Queue()
         listeners.append(box)
         with lock:
-            box.put(json.dumps(state, ensure_ascii=False))   # 늦게 들어와도 지금 판을 받는다
+            # 늦게 들어와도 지금 판을 곧바로 받는다
+            box.put(json.dumps({"book": book}, ensure_ascii=False))
         try:
             while True:
                 try:
@@ -83,17 +84,23 @@ class Handler(SimpleHTTPRequestHandler):
             if box in listeners:
                 listeners.remove(box)
 
-    # ── 기기가 장부에 무엇을 적어 달라고 보낸다 ──────────────────────
+    # ── 기기가 보내는 것 둘 — 장부(book)와 스쳐 가는 한마디(say) ──────
     def do_POST(self):
+        global book
         length = int(self.headers.get("Content-Length") or 0)
         try:
-            patch = json.loads(self.rfile.read(length) or b"{}")
+            sent = json.loads(self.rfile.read(length) or b"{}")
         except json.JSONDecodeError:
-            patch = {}
-        if isinstance(patch, dict):
+            sent = None
+        path = self.path.split("?")[0]
+
+        if path == "/say":
+            broadcast({"say": sent})              # 남기지 않고 그대로 나눠 준다
+        elif path in ("/book", "/state") and isinstance(sent, dict):
             with lock:
-                state.update(patch)
-            broadcast()
+                book = sent                       # 장부는 진행자 화면이 통째로 적어 보낸다
+            broadcast({"book": book})
+
         self.send_response(204)
         self.send_header("Content-Length", "0")
         self.end_headers()
