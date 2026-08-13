@@ -552,7 +552,7 @@ function gauge(){
 }
 
 function run(target){
-  clearAll(); people = []; stage = "entry"; press = 0; noted = ""; voteStarted = false; draw();
+  clearAll(); people = []; words = {}; seq = 0; stage = "entry"; press = 0; noted = ""; voteStarted = false; draw();
   if(booted) Bus.publish({press:0, players:[]});   /* 프리셋을 다시 누르면 판 전체가 처음으로 */
   document.querySelectorAll("#btns button").forEach(b =>
     b.setAttribute("aria-pressed", String(+b.dataset.n === target)));
@@ -567,10 +567,27 @@ function run(target){
 /* ══ 장부의 주인 ═══════════════════════════════════════════════════════
    폰은 「나를 넣어 주세요」라고 말할 뿐이고, 유형과 개인 코드는 여기서 나옵니다.
    한 곳에서 나와야 접속 순서대로 고르게 갈립니다 (6.1 · 5.5).             */
+let words = {};        /* 단어별 수집 수 — 스크린 9.2의 단어 순위가 여기서 나옵니다 */
+let seq = 0;           /* 몇 번째 사건인가 — 같은 개수일 때 먼저 도달한 쪽이 앞섭니다 */
+
 function sync(){
-  Bus.publish({players: people.map(p => ({
-    id:p.id, name:p.named ? p.name : "", type:TYPES.indexOf(p.type), code:p.code
-  }))});
+  Bus.publish({
+    players: people.map(p => ({
+      id:p.id, name:p.named ? p.name : "", type:TYPES.indexOf(p.type), code:p.code,
+      idxInType:p.idxInType, got:p.pairs, sent:p.sentences, at:p.at || 0
+    })),
+    words
+  });
+}
+
+/* 폰이 쌍 하나를 완성할 때마다 — 세는 곳은 여기 하나뿐입니다 */
+function pairReal(id, word){
+  const p = people.find(q => q.id === id);
+  if(!p) return;
+  p.pairs++; p.at = ++seq;
+  const w = words[word] || (words[word] = {n:0, at:0});
+  w.n++; w.at = seq;
+  bump(p); sync();
 }
 
 function joinReal(id){
@@ -597,6 +614,7 @@ Bus.onSay(msg => {
   if(!msg) return;
   if(msg.join) joinReal(msg.join.id);
   if(msg.name) nameReal(msg.name.id, msg.name.name);
+  if(msg.pair) pairReal(msg.pair.id, msg.pair.word);
 });
 
 /* ⛔ 진행자가 실수로 새로고침해도 판이 날아가면 안 됩니다.
@@ -610,9 +628,12 @@ Bus.onState(b => {
     people = b.players.map(p => {
       const type = TYPES[p.type] || TYPES[0];
       return {id:p.id, name:p.name, code:p.code, type, named:!!p.name,
-              idxInType:0, pairs:0, sentences:0, goal:0, writeGoal:0};
+              idxInType:0, pairs:p.got || 0, sentences:p.sent || 0, at:p.at || 0,
+              goal:0, writeGoal:0};
     });
     TYPES.forEach(t => people.filter(p => p.type === t).forEach((p,k) => p.idxInType = k));
+    words = b.words || {};
+    seq = Math.max(0, ...people.map(p => p.at || 0));
     press = b.press || 0;
     stage = press < PRESSES.length ? PRESSES[press].at : "result";
     voteStarted = press >= 5;
