@@ -53,6 +53,8 @@
     : null;
 
   let book = { press: 0, players: [] };
+  const outbox = [];                            /* 아직 장부에서 확인 못 한 말들 */
+  const drop = it => { const i = outbox.indexOf(it); if (i >= 0) outbox.splice(i, 1); };
   const onBook = [], onPress = [], onSay = [];
   let mode = "찾는 중";
 
@@ -88,6 +90,7 @@
     if (!next || typeof next !== "object") return;
     const before = book.press;
     book = { press: 0, players: [], ...next };
+    outbox.slice().forEach(it => { try { if (it.isDone(book)) drop(it); } catch (e) {} });
     onBook.forEach(fn => fn(book));
     if (book.press !== before) {
       onPress.forEach(fn => fn(book.press));
@@ -129,6 +132,18 @@
 
     /* 한마디 — 누구나 */
     say(msg) { push("say", msg); },
+
+    /* ⭐ 닿을 때까지 말한다 — 진행자 화면이 그 순간 안 듣고 있으면
+       한 번 보낸 말은 소리 없이 사라집니다. 장부에 반영된 것이 보일 때까지
+       3초마다 다시 말하고, 보이면 그칩니다.                              */
+    sayUntil(msg, isDone) {
+      const item = { msg, isDone };
+      outbox.push(item);
+      push("say", msg);
+      if (isDone(book)) drop(item);
+    },
+    /* 장부에서 나를 찾는다 */
+    mine(b) { const id = this.me(); return ((b || book).players || []).find(p => p.id === id); },
 
     /* 듣기 */
     onState(fn)  { onBook.push(fn); if (mode !== "찾는 중") fn(book); },
@@ -198,11 +213,11 @@
       const giveUp = setTimeout(() => { c.end(true); no(); }, 12000);
       c.on("connect", () => {
         clearTimeout(giveUp);
-        c.subscribe([T_BOOK, T_SAY], { qos: 0 });
+        c.subscribe([T_BOOK, T_SAY], { qos: 1 });
         ok({
           /* 남겨 두고 보내므로(retain) 늦게 들어온 폰도 지금 판을 곧바로 받는다 */
           book: b => c.publish(T_BOOK, JSON.stringify(b), { qos: 0, retain: true }),
-          say:  m => c.publish(T_SAY,  JSON.stringify(m), { qos: 0 }),
+          say:  m => c.publish(T_SAY,  JSON.stringify(m), { qos: 1 }),
         });
       });
       c.on("message", (topic, buf) => {
@@ -227,6 +242,9 @@
     });
     follow(book.press);
   }
+
+  /* 3초마다 아직 확인 안 된 말을 다시 보냅니다 */
+  setInterval(() => outbox.forEach(it => push("say", it.msg)), 3000);
 
   tryLaptop()
     .then(() => settle("노트북", laptopChannel))

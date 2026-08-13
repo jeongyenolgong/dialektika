@@ -300,7 +300,9 @@ $("#ent").onclick = () => {
   clearInterval(blink);
   c.s = mine;
   /* 진행자 화면이 받아 적습니다 — 투표에서 남의 문장이 뜨려면 장부에 있어야 합니다 */
-  Bus.say({sentence:{id:Bus.me(), word:c.je, pair:c.ban, text:c.s}});
+  const nth = CARDS.filter(x => x.s).length;   /* 이게 몇 번째 문장인가 */
+  Bus.sayUntil({sentence:{id:Bus.me(), word:c.je, pair:c.ban, text:c.s}},
+               b => ((Bus.mine(b) || {}).sent || 0) >= nth);
   mine = ""; $("#hidden").value = "";
   $("#kb").classList.remove("on"); $("#mid").classList.remove("kbup"); $("#msg").textContent = "";
   /* 번쩍이지 않고 **곧바로 다음 카드**로 갑니다 — 앉은 문장을 확인시키지 않습니다

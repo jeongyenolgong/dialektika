@@ -222,7 +222,8 @@ enter.onclick = () => {
   if(!name.length) return;
   $("#flash").style.display = "block";
   later(T.flash*0.3, () => $("#flash").style.display = "none");
-  Bus.say({name:{id:Bus.me(), name}});   /* 진행자 화면이 받아 적어 장부에 올립니다 */
+  /* 장부에 내 이름이 보일 때까지 다시 말합니다 — 한 번 보낸 말은 사라질 수 있습니다 */
+  Bus.sayUntil({name:{id:Bus.me(), name}}, b => (Bus.mine(b) || {}).name === name);
   later(T.flash, () => Bus.go("p3-wait.html", {t:picked}));
 };
 
