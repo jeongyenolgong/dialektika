@@ -1,4 +1,6 @@
 <!doctype html>
+<!-- 목업 살림살이(조작줄 · 가짜 키보드 자리)는 걷어냈습니다 — 2026.08.14 사용자 「테스트할 때 이게 보이면 안 돼」 -->
+
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -53,11 +55,14 @@
   /* 입력란은 흰 밑줄과 커서만 — 상자를 두르지 않습니다 */
   .field{display:flex; align-items:flex-end; gap:0; border-bottom:2px solid var(--name);
          padding:0 8px 8px; min-width:264px; justify-content:center; height:40px}
-  .field span{font-size:24px; line-height:1}
-  .field .ph{color:var(--line)}
-  .caret{display:inline-block; width:12px; height:24px; background:var(--name)}
-  .caret.off{background:transparent}
-  #hidden{position:absolute; opacity:0; width:1px; height:1px; border:0; padding:0}
+  /* ⭐ 진짜 입력 칸입니다. 글자를 스팬으로 다시 그려 흉내 내던 것을 걷어냈습니다 —
+     흉내로는 커서를 옮기거나 가운데 글자를 고칠 수가 없었습니다
+     (2026.08.14 사용자 "텍스트를 입력해야 하는 곳에 편집 기능이 없어").
+     ⚠️ font-size는 16px 아래로 내리지 말 것 — iOS가 포커스될 때 화면을 확대합니다 */
+  .field input{font-family:inherit; font-size:24px; line-height:1; height:28px;
+               color:var(--name); caret-color:var(--name); background:transparent;
+               border:0; outline:0; padding:0; width:100%; text-align:center}
+  .field input::placeholder{color:var(--line); opacity:1}
   .count{font-size:12px; color:var(--line); letter-spacing:.06em}
 
   footer.act{flex:0 0 auto; height:140px; display:flex; align-items:center; justify-content:center}
@@ -97,25 +102,18 @@
 
     <div class="form" id="form">
       <p class="guide">이름을 입력하세요</p>
-      <label class="field" id="field"></label>
+      <label class="field" id="field">
+        <input id="hidden" placeholder="이름" maxlength="12"
+               autocomplete="off" autocapitalize="off" spellcheck="false">
+      </label>
       <p class="count" id="count"></p>
-      <input id="hidden" autocomplete="off" autocapitalize="off" spellcheck="false">
     </div>
   </main>
 
   <footer class="act"><button id="enter">입장</button></footer>
 </div>
 
-<div class="ctl">
-  <p class="help">아래 줄은 <b>목업에만 있는 조작줄</b>입니다. 실제 폰에는 없고, 값이 정해지면 통째로 지웁니다.
-    폰 상자를 누르고 <b>키보드로 직접 쳐 보세요</b>.</p>
-  <div class="row">
-    <button id="replay">처음부터 다시 보기</button>
-    <span class="lbl">P1에서 받은 유형</span>
-    <span id="types"></span>
-  </div>
-  <p id="gauge"></p>
-</div>
+
 
 <script>
 /* ── 목업 전용 ────────────────────────────────────────────────
@@ -147,7 +145,8 @@ const EM_GRID = [
 const MAXLEN = 12;                       /* 6.2 확정 */
 const T = {lift:300, form:300, flash:200};
 
-const $ = s => document.querySelector(s);
+/* 걷어낸 조작줄 요소를 찾아도 죽지 않게 — 빈 자리를 돌려줍니다 */
+const $ = s => document.querySelector(s) || document.createElement("div");
 const em = $("#em"), field = $("#field"), hidden = $("#hidden"), enter = $("#enter");
 let picked = 0, name = "", timers = [], blink = null, caretOn = true;
 const later = (ms,fn) => timers.push(setTimeout(fn, ms));
@@ -165,21 +164,8 @@ function clean(s){
   return [...s].filter(ch => /[가-힣ㄱ-ㅎㅏ-ㅣA-Za-z ]/.test(ch)).join("").slice(0, MAXLEN);
 }
 
+/* 글자는 입력 칸이 스스로 그립니다 — 여기서는 글자 수와 「입장」의 켜짐만 봅니다 */
 function paint(){
-  field.innerHTML = "";
-  if(!name.length){
-    const ph = document.createElement("span");
-    ph.className = "ph"; ph.textContent = "이름";
-    field.appendChild(ph);
-  }else{
-    [...name].forEach(ch => {
-      const s = document.createElement("span");
-      s.textContent = ch; field.appendChild(s);
-    });
-  }
-  const c = document.createElement("span");
-  c.className = "caret" + (caretOn ? "" : " off");
-  field.appendChild(c);
   $("#count").textContent = `${name.length} / ${MAXLEN}`;
   enter.className = name.length ? "on" : "";
   gauge();
@@ -206,17 +192,21 @@ function run(){
   later(T.lift, () => { $("#form").style.visibility = "visible"; paint(); hidden.focus(); });
 
   /* ③ 커서는 깜빡입니다 */
-  blink = setInterval(() => { caretOn = !caretOn; paint(); }, 500);
   paint();
 }
 
 /* ④ 글자는 칸 단위로 뚝뚝 밀립니다 */
 hidden.addEventListener("input", () => {
   name = clean(hidden.value);
-  hidden.value = name;
-  caretOn = true; paint();
+  /* 규칙에 안 맞는 글자를 쳤을 때만 되돌려 씁니다 — 늘 쓰면 커서가 끝으로 튑니다 */
+  if(hidden.value !== name) hidden.value = name;
+  paint();
 });
-document.querySelector(".phone").addEventListener("click", () => hidden.focus());
+/* 빈 자리를 누르면 입력 칸으로 돌아옵니다. 입력 칸 자신과 버튼은 빼고 —
+   다시 focus 하면 커서를 옮기려고 찍은 자리가 도로 끝으로 튑니다 */
+document.querySelector(".phone").addEventListener("click", e => {
+  if(e.target.tagName !== "INPUT" && e.target.tagName !== "BUTTON") hidden.focus();
+});
 
 /* ⑤ 입장 — 한 프레임 번쩍하고 전환. 목업에는 P3가 따로 있으므로 여기서 멈춥니다 */
 enter.onclick = () => {
@@ -258,7 +248,7 @@ $("#replay").onclick = run;
 
 function fit(){
   const p = $("#phone");
-  const avail = innerHeight - document.querySelector(".ctl").offsetHeight - 40;
+  const avail = innerHeight - (document.querySelector(".ctl")?.offsetHeight || 0) - 40;
   const s = Math.min(1, avail / 844);
   p.style.transform = `scale(${s})`;
   p.style.marginBottom = (844 * (s-1)) + "px";

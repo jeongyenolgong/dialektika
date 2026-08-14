@@ -1,4 +1,6 @@
 <!doctype html>
+<!-- 목업 살림살이(조작줄 · 가짜 키보드 자리)는 걷어냈습니다 — 2026.08.14 사용자 「테스트할 때 이게 보이면 안 돼」 -->
+
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -108,16 +110,7 @@
   <div id="drawer"></div>
 </div>
 
-<div class="ctl">
-  <p class="help">아래 줄은 <b>목업에만 있는 조작줄</b>입니다. 실제 폰에는 없습니다.
-    <b>카드를 탭하는 것이 곧 선택</b>입니다. 건너뛰기도 무승부도 없습니다.</p>
-  <div class="row">
-    <button id="reset">투표 처음부터</button>
-    <button id="near">마지막 한 판만 남기고</button>
-    <button id="end">진행자가 「투표 종료 · 결과 발표」 — 스크린 9.5와 동시에 P9</button>
-  </div>
-  <p id="gauge"></p>
-</div>
+
 
 <script>
 /* ── 목업 전용 ────────────────────────────────────────────────
@@ -166,7 +159,8 @@ let MYPAIRS = [
 ];
 let MYRANK = "30명 중 7위";
 
-const $ = s => document.querySelector(s);
+/* 걷어낸 조작줄 요소를 찾아도 죽지 않게 — 빈 자리를 돌려줍니다 */
+const $ = s => document.querySelector(s) || document.createElement("div");
 let round = 1, pair = [], timers = [], t0 = 0, spent = [], onP9 = false;
 let myDuels = null, pairIdx = null;   /* 장부에서 받은 내 대결 목록 */
 const later = (ms,fn) => timers.push(setTimeout(fn, ms));
@@ -310,7 +304,7 @@ $("#end").onclick = render9;
 
 function fit(){
   const p = $("#phone");
-  const avail = innerHeight - document.querySelector(".ctl").offsetHeight - 40;
+  const avail = innerHeight - (document.querySelector(".ctl")?.offsetHeight || 0) - 40;
   const s = Math.min(1, avail / 844);
   p.style.transform = `scale(${s})`;
   p.style.marginBottom = (844 * (s-1)) + "px";

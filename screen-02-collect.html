@@ -353,7 +353,7 @@ function setup(n){
     name: SUR[i % SUR.length] + GIV[(i*7) % GIV.length],
     type: i % 3,
     idxInType: Math.floor(i/3),
-    got: 0,        /* 완성한 쌍 */
+    got: 0,        /* 수집 점수 — 힌트를 쓰면 덜 받습니다 (2026.08.14) */
     at: 0          /* 그 개수에 언제 닿았나 — 동점은 먼저 닿은 쪽이 위 */
   }));
   hits = {}; WORDS.forEach(w => hits[w] = {n:0, at:0});
@@ -379,7 +379,7 @@ function setup(n){
 function one(){
   clock++;
   const p = people[Math.floor(Math.random()*people.length)];
-  p.got++; p.at = clock;
+  p.got += [3,3,2,1][Math.floor(Math.random()*4)]; p.at = clock;
   const w = WORDS[Math.floor(Math.random()*WORDS.length)];
   hits[w].n++; hits[w].at = clock;
 }

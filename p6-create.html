@@ -1,4 +1,6 @@
 <!doctype html>
+<!-- 목업 살림살이(조작줄 · 가짜 키보드 자리)는 걷어냈습니다 — 2026.08.14 사용자 「테스트할 때 이게 보이면 안 돼」 -->
+
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -86,16 +88,18 @@
          white-space:pre-wrap; word-break:keep-all; overflow-wrap:anywhere;
          overflow:hidden; cursor:text}
   .inbox.hide{visibility:hidden}
-  .caret{display:inline-block; width:12px; height:24px; background:var(--name);
-         vertical-align:-3px}
-  .caret.off{background:transparent}
+  /* ⭐ 진짜 입력 칸(textarea)입니다. 글자를 다시 그려 흉내 내던 것을 걷어냈습니다 —
+     흉내로는 커서를 옮기거나 가운데 글자를 고칠 수가 없었습니다
+     (2026.08.14 사용자 "텍스트를 입력해야 하는 곳에 편집 기능이 없어") */
+  textarea.inbox{font-family:inherit; color:var(--name); caret-color:var(--name);
+                 background:transparent; outline:0; resize:none; display:block}
   .entrow{margin-top:14px; display:flex; justify-content:flex-end; width:330px}
   #ent{font-family:inherit; font-size:24px; padding:8px 14px; background:transparent;
        color:var(--dim); border:2px solid var(--dim); cursor:not-allowed}
   #ent.on{color:var(--name); border-color:var(--name); cursor:pointer}
   .entrow.hide{visibility:hidden}
   .msg{height:24px; margin-top:12px; font-size:18px; color:var(--name)}
-  #hidden{position:absolute; opacity:0; width:1px; height:1px; border:0; padding:0}
+
   #kb{flex:0 0 auto; width:100%; height:0; overflow:hidden; border-top:2px solid var(--line);
       display:flex; align-items:center; justify-content:center; font-size:12px;
       color:var(--line); letter-spacing:.1em;
@@ -149,29 +153,18 @@
       </div>
       <p class="count" id="count"></p>
 
-      <div class="inbox" id="inbox"></div>
+      <textarea class="inbox" id="inbox" autocomplete="off" autocapitalize="off"
+                spellcheck="false"></textarea>
       <div class="entrow" id="entrow"><button id="ent">ENT</button></div>
       <p class="msg" id="msg"></p>
     </div>
 
-    <div id="kb">휴대폰 기본 키보드가 차지하는 높이</div>
-    <input id="hidden" autocomplete="off" autocapitalize="off" spellcheck="false">
+    
     <div id="drawer"></div>
   </main>
 </div>
 
-<div class="ctl">
-  <p class="help">아래 줄은 <b>목업에만 있는 조작줄</b>입니다. 실제 폰에는 없습니다.
-    카드는 <b>좌우로 끌거나 ◀▶</b>로 넘깁니다. 입력 박스를 눌러야 키보드가 올라옵니다.</p>
-  <div class="row">
-    <button id="reset">처음부터 다시</button>
-    <button id="prefill">두 편 써 둔 상태로</button>
-    <span class="lbl">팝업</span>
-    <button id="r1">내가 1위</button>
-    <button id="r2">우리 팀 순위 변동</button>
-  </div>
-  <p id="gauge"></p>
-</div>
+
 
 <script>
 /* ── 목업 전용 ────────────────────────────────────────────────
@@ -218,7 +211,8 @@ function myCards(){
 }
 const CARDS = myCards();
 const TYPE_MS = 60, BLINK = 500;
-const $ = s => document.querySelector(s);
+/* 걷어낸 조작줄 요소를 찾아도 죽지 않게 — 빈 자리를 돌려줍니다 */
+const $ = s => document.querySelector(s) || document.createElement("div");
 let at = 0, mine = "", caretOn = true, blink = null, timers = [];
 const later = (ms,fn) => timers.push(setTimeout(fn, ms));
 
@@ -259,31 +253,28 @@ function draw(){
 function go(d){
   /* 끝에서 막지 않고 **돕니다** — 양쪽 다 (2026.08.13 사용자) */
   const n = (at + d + CARDS.length) % CARDS.length;
-  at = n; mine = ""; $("#hidden").value = ""; $("#msg").textContent = "";
+  at = n; mine = ""; $("#inbox").value = ""; $("#msg").textContent = "";
   $("#kb").classList.remove("on"); $("#mid").classList.remove("kbup"); clearInterval(blink);
   draw();
 }
 
-/* 입력 박스 — 띄어쓰기가 그대로 보이고 길어지면 줄이 늘어납니다 */
+/* 입력 박스 — 글자는 입력 칸이 스스로 그립니다. 여기서는 크기만 맞춥니다 */
 function paintBox(){
   const box = $("#inbox");
-  box.innerHTML = (mine ? mine.replace(/</g,"&lt;") : "")
-                + `<span class="caret${caretOn ? "" : " off"}"></span>`;
+  if(box.value !== mine) box.value = mine;
   /* 박스 크기는 그대로 두고 **글자를 줄입니다**. 12의 배수만 씁니다(6.1 — 픽셀이 깨집니다) */
   /* ⚠️ 24 → 12 두 단계로 줄이면 세 줄을 넘는 순간 글자가 반토막 납니다.
         2px씩 차근차근 줄입니다 (2026.08.13 사용자) */
   for(const px of [24, 22, 20, 18, 16, 14, 12]){
     box.style.fontSize = px + "px";
-    box.querySelectorAll(".caret").forEach(c => { c.style.height = px + "px"; c.style.width = (px/2) + "px"; });
     if(box.scrollHeight <= box.clientHeight) break;
   }
   $("#ent").className = mine.length ? "on" : "";
 }
-$("#hidden").addEventListener("input", e => { mine = e.target.value; caretOn = true; paintBox(); gauge(); });
-$("#inbox").addEventListener("click", () => {
-  if(CARDS[at].s) return;
-  $("#hidden").focus(); $("#kb").classList.add("on"); $("#mid").classList.add("kbup");
-  clearInterval(blink); blink = setInterval(() => { caretOn = !caretOn; paintBox(); }, BLINK);
+$("#inbox").addEventListener("input", e => { mine = e.target.value; paintBox(); gauge(); });
+$("#inbox").addEventListener("focus", () => {
+  if(CARDS[at].s){ $("#inbox").blur(); return; }   /* 이미 낸 카드는 못 고칩니다 */
+  $("#kb").classList.add("on"); $("#mid").classList.add("kbup");
 });
 
 const bare = s => s.replace(/\s+/g, "");
@@ -304,7 +295,7 @@ $("#ent").onclick = () => {
   const nth = CARDS.filter(x => x.s).length;   /* 이게 몇 번째 문장인가 */
   Bus.sayUntil({sentence:{id:Bus.me(), nth, word:c.je, pair:c.ban, text:c.s}},
                b => ((((b.ack||{})[Bus.me()]||{}).s)||[]).includes(nth));
-  mine = ""; $("#hidden").value = "";
+  mine = ""; $("#inbox").value = "";
   $("#kb").classList.remove("on"); $("#mid").classList.remove("kbup"); $("#msg").textContent = "";
   /* 번쩍이지 않고 **곧바로 다음 카드**로 갑니다 — 앉은 문장을 확인시키지 않습니다
      (2026.08.13 사용자). 마지막 카드였으면 아직 안 쓴 카드를 찾아 갑니다 */
@@ -356,9 +347,11 @@ $("#drawerBtn").onclick = () => {
 /* ── 순위 알림 (6.12) ── */
 const TOAST_MS = 3500;
 let toastTimer = null;
-function toast(which, no){
+function toast(which, no, team){
   const t = $("#toast");
-  t.innerHTML = which === 1 ? `현재 ${no}위` : `CREATIVE RISK-TAKERS<br>2위 → 1위`;
+  /* 변동은 안 알립니다 — 지금 몇 위인지만 (2026.08.14 사용자) */
+  t.innerHTML = which === 1 ? `현재 ${no}위`
+                            : (team || `CREATIVE RISK-TAKERS<br>현재 1위`);
   clearTimeout(toastTimer);
   t.classList.add("on");
   toastTimer = setTimeout(() => t.classList.remove("on"), TOAST_MS);
@@ -378,7 +371,7 @@ function gauge(){
 function start(){
   timers.forEach(clearTimeout); timers = []; clearInterval(blink);
   CARDS.forEach(c => c.s = "");
-  at = 0; mine = ""; $("#hidden").value = ""; $("#msg").textContent = "";
+  at = 0; mine = ""; $("#inbox").value = ""; $("#msg").textContent = "";
   $("#kb").classList.remove("on"); $("#toast").classList.remove("on");
   $("#drawer").classList.remove("on"); $("#drawerBtn").textContent = "서랍";
   const g = "두 단어를 조합해서 문장을 만드세요";
@@ -398,7 +391,7 @@ $("#prefill").onclick = () => {
 
 function fit(){
   const p = $("#phone");
-  const avail = innerHeight - document.querySelector(".ctl").offsetHeight - 40;
+  const avail = innerHeight - (document.querySelector(".ctl")?.offsetHeight || 0) - 40;
   const s = Math.min(1, avail / 844);
   p.style.transform = `scale(${s})`;
   p.style.marginBottom = (844 * (s-1)) + "px";
@@ -418,12 +411,12 @@ if(q.get("v") === "long") later(60, () => {                       /* 아주 긴 
 if(q.get("v") === "typinglong") later(60, () => {
   mine = "따뜻한 감수성이 오래도록 식지 않고 남아 있는 사람에게는 서늘한 이성이 닿지 못하는 "
        + "자리가 하나쯤 있고 그 자리가 결국 그 사람을 설명한다 그래서 나는 오늘도 그 자리를 본다";
-  $("#hidden").value = mine;
+  $("#inbox").value = mine;
   $("#kb").classList.add("on"); $("#mid").classList.add("kbup"); paintBox();
 });
 if(q.get("v") === "typing") later(60, () => {
   mine = "따뜻한 감수성이 식으면 그 자리에 서늘한 이성만 남는다";
-  $("#hidden").value = mine;
+  $("#inbox").value = mine;
   $("#kb").classList.add("on"); $("#mid").classList.add("kbup"); paintBox();
 });
 </script>
@@ -431,9 +424,9 @@ if(q.get("v") === "typing") later(60, () => {
 <script>
 /* ⭐ 6.12 순위 알림 — 개인은 1·2·3위에게, 팀은 그 팀 전원에게.
       창작이면 쓴 문장 수로 셉니다. 문구는 두 단계가 같습니다. */
-Bus.watchRank("sent",
-  no => toast(1, no),
-  (label, from, to) => toast(2, 0, `${label}<br>${from}위 → ${to}위`));
+Bus.watchRank("sent", a =>
+  a.kind === "me" ? toast(1, a.no)
+                  : toast(2, 0, `${a.label}<br>현재 ${a.no}위`));
 </script>
 </body>
 </html>

@@ -299,13 +299,13 @@ function layout(){
 /* 그 단계에서 세는 것 — 열 머리 아래 숫자와 이름 옆 숫자가 같은 것을 셉니다 */
 const teamNum = c =>
   stage === "entry"   ? c.members.length
-: stage === "collect" ? c.members.reduce((s,p) => s + p.pairs, 0)
+: stage === "collect" ? c.members.reduce((s,p) => s + p.points, 0)
 : stage === "create"  ? c.members.reduce((s,p) => s + p.sentences, 0)
                       : `${c.members.filter(p => p.voted).length} / ${c.members.length}`;
 
 const personNum = p =>
   stage === "entry"   ? ""
-: stage === "collect" ? String(p.pairs)
+: stage === "collect" ? String(p.points)   /* 개수가 아니라 점수 — 힌트를 쓰면 덜 받습니다 */
 : stage === "create"  ? `${p.sentences} / ${p.pairs}`  /* 8.4 — 0/0을 가리려고 둘을 붙여 씁니다 */
                       : (p.voted ? "완료" : "");       /* 8.5 — 아직인 사람은 비워 둔다 */
 
@@ -406,7 +406,7 @@ function arrive(i){
                     : 3 + Math.floor(rnd(i)*5);   /* 3~7 */
   const p = {id:"mock"+i, name:nameAt(i), code:codeAt(i), type,
              idxInType:people.filter(q => q.type === type).length,
-             named:false, pairs:0, sentences:0, goal,
+             named:false, pairs:0, points:0, sentences:0, goal,
              /* 한 명은 쌍이 있는데 한 편도 안 씁니다 (0/4) */
              writeGoal: i === 2 ? 0 : Math.max(1, Math.round(goal * (0.5 + rnd(i+100)*0.5)))};
   people.push(p);
@@ -441,7 +441,8 @@ function runCollect(){
     const slow = p.type === TYPES[2];
     (function one(){
       if(p.pairs >= p.goal) return;
-      later(() => { p.pairs++; bump(p); one(); },
+      later(() => { p.pairs++; p.points += [3,3,2,1][Math.floor(Math.random()*4)];
+                    bump(p); one(); },
             (slow ? 2200 : 1300) + Math.random()*1800);
     })();
   });
@@ -598,7 +599,7 @@ function sync(){
   Bus.publish({
     players: people.map(p => ({
       id:p.id, name:p.named ? p.name : "", type:TYPES.indexOf(p.type), code:p.code,
-      idxInType:p.idxInType, got:p.pairs, sent:p.sentences, at:p.at || 0,
+      idxInType:p.idxInType, got:p.points, cnt:p.pairs, sent:p.sentences, at:p.at || 0,
       voted:!!p.voted, score:scoreOf(p.id), votes:Object.keys(ballots[p.id] || {}).length
     })),
     words, sents, sentences, duels, wins, gen, ack
@@ -606,14 +607,15 @@ function sync(){
 }
 
 /* 폰이 쌍 하나를 완성할 때마다 — 세는 곳은 여기 하나뿐입니다 */
-function pairReal(id, nth, word){
+function pairReal(id, nth, word, pt){
   const p = people.find(q => q.id === id);
   if(!p) return;
   const key = `pair:${id}:${nth}`;
   remember(id, 'p', nth);
   if(heard[key]) { sync(); return; }             /* 다시 들은 말입니다 */
   heard[key] = true;
-  p.pairs++; p.at = ++seq;
+  p.pairs++; p.points += (pt == null ? 3 : pt);   /* 힌트를 안 쓰면 3점 (SCORE) */
+  p.at = ++seq;
   const w = words[word] || (words[word] = {n:0, at:0});
   w.n++; w.at = seq;
   bump(p); sync();
@@ -638,8 +640,20 @@ function colOf(p){ return layout().findIndex(c => c.members.includes(p)); }
 
 /* ⭐ 개인 점수 셈법은 이 함수 하나뿐입니다 (7.5).
       승률로 바꾸려면 여기만 갈아 끼웁니다 — 팀 평균과 나머지는 그대로입니다 */
+/* ⭐ 개인 점수 = 세 단계를 누적합니다 — 수집 + 창작 + 투표
+      (2026.08.14 사용자 "점수는 각 단계별 누적이야 · 수집접수 창작점수 투표점수 누적해서").
+      옛 규칙은 「득표 합계」 하나였습니다(7.1) — 그건 아래 vote 자리에 그대로 남아 있습니다.
+
+   ⭐ 무게는 여기 한 줄뿐입니다. 플레이 테스트 뒤에 이 숫자만 갈아 끼웁니다(7.5).
+      수집 한 장은 힌트에 따라 3·2·1점이고, 창작은 한 편, 투표는 한 표가 기준입니다.  */
+const WEIGHT = { collect: 1, create: 1, vote: 1 };
+
 function scoreOf(id){
-  return sentences.reduce((n,x,i) => n + (x.by === id ? (wins[i] || 0) : 0), 0);
+  const p = people.find(q => q.id === id) || {};
+  const votes = sentences.reduce((n,x,i) => n + (x.by === id ? (wins[i] || 0) : 0), 0);
+  return (p.points || 0)    * WEIGHT.collect
+       + (p.sentences || 0) * WEIGHT.create
+       + votes              * WEIGHT.vote;
 }
 
 function buildDuels(){
@@ -712,7 +726,7 @@ function joinReal(id){
   const type = TYPES[i % 3];                      /* 6.1 — 접속 순서대로 균등 배정 */
   people.push({id, name:"", code:codeAt(i), type,
                idxInType:people.filter(q => q.type === type).length,
-               named:false, pairs:0, sentences:0, goal:0, writeGoal:0});
+               named:false, pairs:0, points:0, sentences:0, goal:0, writeGoal:0});
   const h = document.getElementById("heroN");
   if(h){ h.textContent = people.length;
          h.classList.remove("tick"); void h.offsetWidth; h.classList.add("tick"); }
@@ -730,7 +744,7 @@ Bus.onSay(msg => {
   if(!msg) return;
   if(msg.join) joinReal(msg.join.id);
   if(msg.name) nameReal(msg.name.id, msg.name.name);
-  if(msg.pair) pairReal(msg.pair.id, msg.pair.nth, msg.pair.word);
+  if(msg.pair) pairReal(msg.pair.id, msg.pair.nth, msg.pair.word, msg.pair.pt);
   if(msg.sentence) sentReal(msg.sentence.id, msg.sentence.nth, msg.sentence.word, msg.sentence.pair, msg.sentence.text);
   if(msg.vote) voteReal(msg.vote.id, msg.vote.k, msg.vote.win);
 });
@@ -746,7 +760,8 @@ Bus.onState(b => {
     people = b.players.map(p => {
       const type = TYPES[p.type] || TYPES[0];
       return {id:p.id, name:p.name, code:p.code, type, named:!!p.name,
-              idxInType:0, pairs:p.got || 0, sentences:p.sent || 0, at:p.at || 0,
+              idxInType:0, pairs:p.cnt || 0, points:p.got || 0,
+              sentences:p.sent || 0, at:p.at || 0,
               goal:0, writeGoal:0};
     });
     TYPES.forEach(t => people.filter(p => p.type === t).forEach((p,k) => p.idxInType = k));

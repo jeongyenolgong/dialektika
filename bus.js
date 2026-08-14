@@ -190,33 +190,49 @@
     },
 
     /* ⭐ 6.12 순위 알림 — P4·P5·P6에 같은 것이 걸립니다.
-       basis: 수집이면 "got", 창작이면 "sent".
-       개인은 **1·2·3위에 들었을 때 그 세 사람에게만**,
-       팀은 **우리 팀 순위가 바뀌었을 때 팀원 전원에게**.               */
-    watchRank(basis, onSelf, onTeam) {
-      let lastSelf = 0, lastTeam = 0;
-      this.onState(b => {
+       basis: 수집이면 "got"(=수집 점수), 창작이면 "sent".
+
+       ⭐ 2026.08.14 — **1분마다 그때의 순위를 재서 발표합니다.**
+          ⛔ 「등수가 바뀌었을 때만」으로 두었더니 **계속 1위인 사람에게는 두 번 다시
+             안 울렸습니다**(사용자가 플레이 테스트에서 잡음). 변동은 알리지 않습니다 —
+             「2위 → 1위」가 아니라 **지금 몇 위인지만**.
+       ⭐ 개인 먼저, 팀은 **시간차를 두고** 뒤에 옵니다 — 한꺼번에 쏘면 두 알림이 겹칩니다
+          (사용자 "동시에 알림이 오면 겹쳐서 오류가 생길 수 있으니까 · 서로 시간차를 두어야겠지").
+       개인은 1·2·3위일 때만, 팀도 1·2·3위일 때만 옵니다.                    */
+    watchRank(basis, onAnnounce) {
+      const PERIOD = 60000;
+      /* ⚠️ 알림 하나가 화면에 3.5초 머뭅니다 — 그보다 길게 잡아야 앞엣것을 밀어내지 않습니다 */
+      const GAP = 4500;
+      let latest = null;
+      this.onState(b => { latest = b; });
+
+      const announce = () => {
+        const b = latest; if (!b) return;
         const P = (b.players || []).filter(p => p.name);
         const me = this.mine(b);
         if (!me || !P.length) return;
 
         const ranked = [...P].sort((x, y) => (y[basis]||0) - (x[basis]||0) || (x.at||0) - (y.at||0));
-        const mineNo = ranked.findIndex(p => p.id === me.id) + 1;
-        /* ⛔아직 하나도 못 모은 동안의 등수는 기억하지 않습니다 —
-           기억해 버리면 첫 알림이 「바뀐 적 없다」로 막힙니다 */
-        if ((me[basis]||0) > 0) {
-          if (mineNo >= 1 && mineNo <= 3 && mineNo !== lastSelf) onSelf(mineNo);
-          lastSelf = mineNo;
-        }
+        const no = ranked.findIndex(p => p.id === me.id) + 1;
+        /* 아직 하나도 못 모은 사람에게는 등수를 말하지 않습니다 */
+        const mineNo = ((me[basis]||0) > 0 && no >= 1 && no <= 3) ? no : 0;
 
         const cols = this.teams(P).map(c => ({ ...c,
           avg: c.members.length ? c.members.reduce((n, m) => n + (m[basis]||0), 0) / c.members.length : 0,
           at:  Math.max(0, ...c.members.map(m => m.at || 0)) }))
           .sort((a, c) => c.avg - a.avg || a.at - c.at);
-        const teamNo = cols.findIndex(c => c.members.some(p => p.id === me.id)) + 1;
-        if (teamNo > 0 && lastTeam > 0 && teamNo !== lastTeam) onTeam(cols[teamNo-1].label, lastTeam, teamNo);
-        if (teamNo > 0) lastTeam = teamNo;
-      });
+        const t = cols.findIndex(c => c.members.some(p => p.id === me.id)) + 1;
+        const teamNo = (t >= 1 && t <= 3 && cols[t-1].avg > 0) ? t : 0;
+
+        if (mineNo) onAnnounce({ kind:"me", no: mineNo });
+        if (teamNo) setTimeout(() => onAnnounce({ kind:"team", no: teamNo,
+                                                 label: cols[teamNo-1].label }),
+                               mineNo ? GAP : 0);
+      };
+
+      /* 모든 폰이 같은 순간에 울립니다 — 「발표」니까 벽시계에 맞춥니다 */
+      setTimeout(function tick(){ announce(); setTimeout(tick, PERIOD); },
+                 PERIOD - (Date.now() % PERIOD));
     },
 
     /* 듣기 */

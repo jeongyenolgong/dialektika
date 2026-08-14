@@ -1,10 +1,15 @@
 <!doctype html>
+<!-- 목업 살림살이(조작줄 · 가짜 키보드 자리)는 걷어냈습니다 — 2026.08.14 사용자 「테스트할 때 이게 보이면 안 돼」 -->
+
 <html lang="ko">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>디알렉티카 — P4 코드 입력 · P5 반대말 입력 · 서랍 (모바일)</title>
+<!-- ⛔ 확대 금지 — 버튼이 아닌 자리를 두 번 두드리면 화면이 확대되어 판이 어긋났습니다
+     (2026.08.14 사용자 "이거 버그 같아. 하지마"). 게임 화면은 폰 한 판에 딱 맞아야 합니다 -->
+<meta name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>디알렉티카 — P4 단어 입력 · P5 반대말 입력 · 서랍 (모바일)</title>
 <style>
   :root{
     --bg:#101C8C; --bg-2:#0A1266; --line:#4E60D8; --name:#FFFFFF;
@@ -13,7 +18,8 @@
     --phoneW:390px; --phoneH:844px;
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  html,body{height:100%}
+  /* 두 번 두드려 확대하는 동작을 없앱니다 — 위 viewport와 한 짝입니다 */
+  html,body{height:100%; touch-action:manipulation; -webkit-text-size-adjust:100%}
   body{
     background:var(--bg-2); color:var(--name);
     font-family:"Galmuri11","Apple SD Gothic Neo",monospace;
@@ -85,26 +91,66 @@
   .inrow{display:flex; align-items:flex-end; gap:12px; margin-top:40px}
   /* 목업 전용 — PC에서 확인하려고 폰 키보드가 먹는 높이를 그대로 재현합니다.
      실제 폰에서는 OS가 올리는 진짜 키보드입니다 */
-  #kb{flex:0 0 auto; width:100%; height:0; overflow:hidden; border-top:2px solid var(--line);
+  .kb{flex:0 0 auto; width:100%; height:0; overflow:hidden; border-top:2px solid var(--line);
       display:flex; align-items:center; justify-content:center;
       font-size:12px; color:var(--line); letter-spacing:.1em;
       background:repeating-linear-gradient(135deg,
         rgba(78,96,216,.18) 0 6px, transparent 6px 12px);}
-  #kb.on{height:300px}
+  .kb.on{height:300px}
   .field{border-bottom:2px solid var(--name); width:216px; height:40px;
          display:flex; align-items:flex-end; padding-bottom:6px; overflow:hidden}
   .field.draw{border-bottom-color:transparent}
-  .field span{font-size:24px; line-height:1}
-  .caret{display:inline-block; width:12px; height:24px; background:var(--name)}
-  .caret.off{background:transparent}
-  #ent{font-family:inherit; font-size:24px; padding:8px 12px; background:transparent;
+  /* ⭐ 진짜 입력 칸입니다. 글자를 스팬으로 다시 그려 흉내 내던 것을 걷어냈습니다 —
+     흉내로는 커서를 옮기거나 가운데 글자를 고칠 수가 없었고, 띄어쓰기도 붙어 보였습니다
+     (2026.08.14 사용자 "텍스트를 입력해야 하는 곳에 편집 기능이 없어").
+     ⚠️ font-size는 16px 아래로 내리지 말 것 — iOS가 포커스될 때 화면을 확대합니다 */
+  .field input{font-family:inherit; font-size:24px; line-height:1; height:28px;
+               color:var(--name); caret-color:var(--name); background:transparent;
+               border:0; outline:0; padding:0; width:100%}
+  .field.draw input{visibility:hidden}
+  .ent{font-family:inherit; font-size:24px; padding:8px 12px; background:transparent;
        color:var(--dim); border:2px solid var(--dim); cursor:not-allowed}
-  #ent.on{color:var(--name); border-color:var(--name); cursor:pointer}
+  .ent.on{color:var(--name); border-color:var(--name); cursor:pointer}
   /* 「뒤로」 — 숫자판 키와 같은 결·같은 테두리로 (2026.08.12 사용자) */
-  #back{font-family:inherit; font-size:24px; letter-spacing:.1em; margin-top:40px;
+  .back{font-family:inherit; font-size:24px; letter-spacing:.1em; margin-top:40px;
         background:transparent; color:var(--name); border:2px solid var(--line);
         padding:12px 28px; cursor:pointer}
-  #hidden{position:absolute; opacity:0; width:1px; height:1px; border:0; padding:0}
+  /* ⚠️ font-size는 16px보다 작으면 안 됩니다 — 작으면 iOS가 이 칸에 포커스가 갈 때
+     화면을 제멋대로 확대합니다. 어차피 안 보이는 칸이라 크기는 아무래도 됩니다 */
+  .hide{position:absolute; opacity:0; width:1px; height:1px; border:0; padding:0; font-size:16px}
+
+  /* ── P5단 · 격자에서 찾은 단어 입력 ──
+     ⛔ 코드를 넣었다고 단어를 보여주지 않습니다 (2026.08.14 사용자 "폐기야").
+        포스터를 실제로 읽은 사람만 넘어갑니다 */
+  #hintRow{display:flex; gap:12px; align-items:center; margin-top:28px; height:44px}
+  #hintBtn{font-family:inherit; font-size:24px; letter-spacing:.08em;
+           background:transparent; color:var(--name); border:2px solid var(--line);
+           padding:8px 18px; cursor:pointer}
+  #hintBtn.off{color:var(--dim); border-color:var(--dim); cursor:not-allowed}
+  /* 쓴 힌트는 지워지지 않고 쌓입니다 — 값을 치른 것이 눈에 남아 있어야 합니다 */
+  #hints{margin-top:22px; min-height:64px; display:flex; flex-direction:column;
+         align-items:center; gap:10px; font-size:24px; line-height:1}
+  #hints .h{display:flex; align-items:center; gap:10px; color:var(--name)}
+  #hints .h .k{color:var(--line)}
+  /* 어절 사이를 크게 벌립니다 — 「세 글자 + 세 글자」가 한눈에 갈려야 합니다 */
+  .boxes{display:flex; gap:28px}
+  .boxes .grp{display:flex; gap:6px}
+  .boxes i{display:block; width:20px; height:20px; background:var(--name)}
+
+  /* ── 실제로 폰에서 돌 때는 목업 살림살이를 통째로 내립니다 ──
+     ⭐ 스위치를 만들지 않았습니다. 손가락으로 만지는 기기면 실제 플레이, 마우스가 있으면 검토용입니다
+        (2026.08.14 사용자 "실제로 팀원들과 플레이 할 때는 목업 조작줄 안 나오게 해야 해") */
+  /* 노트북으로 그냥 보여 줄 때를 위해 주소 끝에 ?play 를 붙여도 같이 내려갑니다 */
+  body.play .ctl, body.play .kb{display:none}
+  body.play{padding:0; gap:0}
+  @media (pointer: coarse){
+    /* 조작줄 — 실제 폰에는 없습니다 */
+    .ctl{display:none}
+    /* 가짜 키보드 자리 — 진짜 키보드가 올라오는데 이것까지 있으면 두 겹이 됩니다
+       (2026.08.14 사용자 "휴대폰 기본 키보드가 올라오는 곳이 실제 게임을 할 때도 보였어") */
+    .kb{display:none}
+    body{padding:0; gap:0}
+  }
   /* ⑦ 쌍이 되어 날아오릅니다 — 서랍으로 빨려 들며 점점 작아집니다.
        도는 동안 나머지 요소는 사라집니다(2026.08.12 사용자) */
   #fly{position:absolute; z-index:7; display:none; font-size:48px; line-height:1;
@@ -196,19 +242,38 @@
       <div class="pad" id="pad"></div>
     </section>
 
+    <!-- P5단 — 격자에서 찾은 단어를 스스로 적는 자리. 여기를 통과해야 반(反)으로 갑니다 -->
+    <section class="view" id="v5w">
+      <div class="mid" id="v5wmid">
+        <p class="guide" id="gw"></p>
+        <div class="inrow">
+          <label class="field" id="fieldw">
+            <input id="hiddenw" autocomplete="off" autocapitalize="off" spellcheck="false">
+          </label>
+          <button id="entw" class="ent">ENT</button>
+        </div>
+        <p class="msg" id="msgw"></p>
+        <div id="hintRow"><button id="hintBtn">힌트 2개</button></div>
+        <div id="hints"></div>
+        <button id="backw" class="back">뒤로</button>
+      </div>
+      
+    </section>
+
     <!-- P5 — 정(正)이 뜨고 내가 반(反)을 짓는 자리 -->
     <section class="view" id="v5">
       <div class="mid" id="v5mid">
         <div id="word"></div>
         <p id="instr"></p>
         <div class="inrow">
-          <label class="field" id="field"></label>
-          <button id="ent">ENT</button>
+          <label class="field" id="field">
+            <input id="hidden" autocomplete="off" autocapitalize="off" spellcheck="false">
+          </label>
+          <button id="ent" class="ent">ENT</button>
         </div>
-        <button id="back">뒤로</button>
+        <button id="back" class="back">뒤로</button>
       </div>
-      <div id="kb">휴대폰 기본 키보드가 차지하는 높이</div>
-      <input id="hidden" autocomplete="off" autocapitalize="off" spellcheck="false">
+      
     </section>
 
     <!-- 서랍 — 보기 전용. 버튼은 「닫기」 하나뿐입니다 -->
@@ -216,21 +281,7 @@
   </main>
 </div>
 
-<div class="ctl">
-  <p class="help">아래 줄은 <b>목업에만 있는 조작줄</b>입니다. 실제 폰에는 없고, 값이 정해지면 통째로 지웁니다.
-    <b id="hint"></b> · 없는 코드(예: 111)와 이미 모은 코드도 눌러 보시면 반응이 다릅니다.</p>
-  <div class="row">
-    <button id="reset">처음부터 다시</button>
-    <button id="fill">쌍 다섯 개 모아 둔 상태로</button>
-    <span class="lbl">팝업 —</span>
-    <button id="rank1">내가 1위</button>
-    <button id="rank1b">내가 2위</button>
-    <button id="rank1c">내가 3위</button>
-    <button id="rank2">우리 팀 순위 변동</button>
-    <button id="done">단어 수집 완료 상태로</button>
-  </div>
-  <p id="gauge"></p>
-</div>
+
 
 <script>
 /* ── 목업 전용 ────────────────────────────────────────────────
@@ -245,17 +296,25 @@
       코드는 난수 3자리이고 지시문 종류(A·B)도 단어마다 정해져 있습니다.
    ⛔ 판정하지 않습니다(6.5) — 무엇을 써도 수집됩니다. 정답표가 없습니다.     */
 
+/* d — 그 포스터의 격자에서 단어가 놓인 방향. 힌트 ①이 이걸 알려 줍니다.
+      `posters/build_review.py`가 낸 검토판에서 그대로 옮겨 왔습니다.
+   ⚠️ 격자를 다시 빌드하면 방향이 바뀔 수 있습니다 — 그때 이 표도 같이 갈아 끼웁니다 */
 const POSTERS = [
-{"c":"134","w":"응시","p":"A"},{"c":"174","w":"포용","p":"B"},{"c":"179","w":"뜻밖의 설렘","p":"A"},
-{"c":"304","w":"도전","p":"A"},{"c":"312","w":"따뜻한 감수성","p":"B"},{"c":"324","w":"관점","p":"A"},
-{"c":"335","w":"변화의 흐름","p":"A"},{"c":"396","w":"프로토타입","p":"A"},{"c":"398","w":"상상","p":"B"},
-{"c":"409","w":"기존의 틀","p":"A"},{"c":"434","w":"사색","p":"A"},{"c":"449","w":"영감의 언덕","p":"B"},
-{"c":"470","w":"본질","p":"A"},{"c":"478","w":"인간 중심","p":"A"},{"c":"482","w":"조화","p":"B"},
-{"c":"507","w":"경계","p":"A"},{"c":"516","w":"모험가 정신","p":"A"},{"c":"536","w":"직관","p":"A"},
-{"c":"625","w":"오래된 사유","p":"B"},{"c":"648","w":"감각의 언어","p":"A"},{"c":"672","w":"일상","p":"A"},
-{"c":"726","w":"물성","p":"B"},{"c":"744","w":"잊힌 흔적","p":"A"},{"c":"778","w":"역동성","p":"A"},
-{"c":"831","w":"헤리티지","p":"B"},{"c":"851","w":"지속되는 태도","p":"A"},{"c":"903","w":"오래된 언어","p":"A"},
-{"c":"906","w":"도시의 결","p":"B"},{"c":"948","w":"손의 감각","p":"A"},{"c":"956","w":"방심의 시간","p":"B"}
+{"c":"134","w":"응시","p":"A","d":"대각선 ↘"},{"c":"174","w":"포용","p":"B","d":"세로"},
+{"c":"179","w":"뜻밖의 설렘","p":"A","d":"대각선 ↗"},{"c":"304","w":"도전","p":"A","d":"대각선 ↘"},
+{"c":"312","w":"따뜻한 감수성","p":"B","d":"가로"},{"c":"324","w":"관점","p":"A","d":"가로"},
+{"c":"335","w":"변화의 흐름","p":"A","d":"대각선 ↗"},{"c":"396","w":"프로토타입","p":"A","d":"가로"},
+{"c":"398","w":"상상","p":"B","d":"대각선 ↘"},{"c":"409","w":"기존의 틀","p":"A","d":"세로"},
+{"c":"434","w":"사색","p":"A","d":"대각선 ↗"},{"c":"449","w":"영감의 언덕","p":"B","d":"세로"},
+{"c":"470","w":"본질","p":"A","d":"대각선 ↘"},{"c":"478","w":"인간 중심","p":"A","d":"대각선 ↘"},
+{"c":"482","w":"조화","p":"B","d":"대각선 ↗"},{"c":"507","w":"경계","p":"A","d":"세로"},
+{"c":"516","w":"모험가 정신","p":"A","d":"가로"},{"c":"536","w":"직관","p":"A","d":"대각선 ↗"},
+{"c":"625","w":"오래된 사유","p":"B","d":"세로"},{"c":"648","w":"감각의 언어","p":"A","d":"가로"},
+{"c":"672","w":"일상","p":"A","d":"세로"},{"c":"726","w":"물성","p":"B","d":"세로"},
+{"c":"744","w":"잊힌 흔적","p":"A","d":"가로"},{"c":"778","w":"역동성","p":"A","d":"대각선 ↘"},
+{"c":"831","w":"헤리티지","p":"B","d":"대각선 ↗"},{"c":"851","w":"지속되는 태도","p":"A","d":"대각선 ↗"},
+{"c":"903","w":"오래된 언어","p":"A","d":"대각선 ↗"},{"c":"906","w":"도시의 결","p":"B","d":"대각선 ↘"},
+{"c":"948","w":"손의 감각","p":"A","d":"가로"},{"c":"956","w":"방심의 시간","p":"B","d":"가로"}
 ];
 const PROMPT = {A:["반대말", "이 단어의 ", "을 입력하세요"], B:["비슷한 말", "이 단어의 ", "을 입력하세요"]};
 /* 빈 슬롯은 안 깝니다 — 모은 줄만 그립니다 (2026.08.12 사용자) */
@@ -272,7 +331,8 @@ const EM_GRID = [
 const TC = ["var(--t0)","var(--t1)","var(--t2)"];
 const MYTYPE = 1;                       /* 이 폰의 주인 — 목업에서는 방패 */
 
-const $ = s => document.querySelector(s);
+/* 걷어낸 조작줄 요소를 찾아도 죽지 않게 — 빈 자리를 돌려줍니다 */
+const $ = s => document.querySelector(s) || document.createElement("div");
 let code = "", pairs = [], mine = "", cur = null, back = "v4",
     caretOn = true, blink = null, timers = [], allDone = false;
 const later = (ms,fn) => timers.push(setTimeout(fn, ms));
@@ -353,9 +413,9 @@ function enter(){
     code = ""; paintSlots(); paintPad();
     return;
   }
-  cur = found;                       /* ④ 맞음 — 3칸이 흰색으로 물들고 P5로 */
+  cur = found;                       /* ④ 맞음 — 3칸이 흰색으로 물들고 단어 입력으로 */
   paintSlots(true);
-  later(180, () => { code = ""; paintSlots(); paintPad(); toP5(); });
+  later(180, () => { code = ""; paintSlots(); paintPad(); toWord(); });
 }
 function say(t){
   $("#msg").textContent = t;
@@ -373,14 +433,148 @@ function blinkDrawer(){
   [0,1,2,3].forEach(i => later(i*90, () => b.classList.toggle("flash", i%2 === 0)));
 }
 
+/* ── P5단 · 격자에서 찾은 단어 입력 ─────────────────────────────
+   ⛔ 코드를 넣었다고 단어를 보여주지 않습니다 — 2026.08.14 사용자 「폐기야」.
+      포스터를 실제로 읽은 사람만 반대말 자리로 넘어갑니다.
+   힌트는 두 번까지 — ①방향 ②글자 수. 쓸수록 그 단어의 점수가 깎입니다.      */
+
+/* ⭐ 배점은 여기 한 줄뿐입니다 — 플레이 테스트 뒤에 이 줄만 갈아 끼웁니다.
+      셈법을 여러 곳에 흩어 놓으면 폰·스크린·진행자 화면이 어긋납니다 (7.5) */
+const SCORE = [3, 2, 1];            /* 힌트 0회 · 1회 · 2회 */
+
+let guess = "", hintsUsed = 0;
+
+/* ── 관대한 대조 ──
+   우리가 재는 건 철자 실력이 아니라 **포스터 앞에 있었는가**다.
+   ① 공백은 무시한다 — 두 어절 단어가 15개다
+   ② 자모 하나 차이는 통과시킨다 — 한글 오타는 대개 자모 하나가 어긋난 모양이다.
+      안 읽은 사람은 자모 하나 차이로 못 맞힌다.                              */
+const CHO_="ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ";
+const JUNG_="ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ";
+const JONG_=" ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ";
+function jamo(s){
+  const out = [];
+  for(const ch of (s||"").replace(/\s+/g,"")){
+    const o = ch.charCodeAt(0) - 0xAC00;
+    if(o >= 0 && o < 11172){
+      out.push(CHO_[Math.floor(o/588)], JUNG_[Math.floor((o%588)/28)]);
+      const j = JONG_[o%28]; if(j !== " ") out.push(j);
+    } else out.push(ch);
+  }
+  return out;
+}
+function near(a, b){                 /* 편집거리 1 이하인가 */
+  if(Math.abs(a.length - b.length) > 1) return false;
+  let i=0, j=0, d=0;
+  while(i < a.length && j < b.length){
+    if(a[i] === b[j]){ i++; j++; continue; }
+    if(++d > 1) return false;
+    if(a.length > b.length) i++;
+    else if(a.length < b.length) j++;
+    else { i++; j++; }
+  }
+  return d + (a.length - i) + (b.length - j) <= 1;
+}
+const matches = (input, word) => {
+  const a = jamo(input), b = jamo(word);
+  return a.join("") === b.join("") || near(a, b);
+};
+
+function toWord(){
+  clearInterval(blink); clearAll();
+  guess = ""; hintsUsed = 0; $("#hiddenw").value = "";
+  show("v5w"); back = "v5w";
+  const f = $("#fieldw");
+  $("#gw").textContent = ""; $("#msgw").textContent = ""; $("#hints").innerHTML = "";
+  paintHintBtn(); $("#entw").className = "ent";
+  f.className = "field draw";        /* ⛔ innerHTML을 비우지 말 것 — 입력 칸이 지워집니다 */
+
+  const t = "포스터에서 찾은 단어 입력";
+  for(let i=1;i<=t.length;i++)
+    later(i*TYPE_MS, () => $("#gw").textContent = t.slice(0,i));
+  const B = t.length*TYPE_MS + 120;
+  later(B, () => { f.className = "field"; paintW(); });
+  later(B + 150, () => { $("#hiddenw").focus(); $("#kbw").classList.add("on"); });
+  gauge();
+}
+/* 이제 글자는 입력 칸이 스스로 그립니다 — 여기서는 ENT의 켜짐만 봅니다 */
+function paintW(){
+  $("#entw").className = "ent" + (guess.trim().length ? " on" : "");
+}
+$("#hiddenw").addEventListener("input", e => { guess = e.target.value; paintW(); });
+$("#v5w").addEventListener("click", e => {
+  if(e.target.tagName !== "BUTTON" && e.target.tagName !== "INPUT") $("#hiddenw").focus();
+});
+
+/* ⭐ 틀려도 잃는 것이 없습니다 — 횟수 제한도, 실패 기록도 없습니다.
+      오답과 오타를 가르지 않습니다. 둘 다 뜻은 하나 — 아직 안 열림 */
+$("#entw").onclick = () => {
+  if(!guess.trim().length) return;
+  if(!matches(guess, cur.w)){ sayW("다시 보세요"); shakeW(); return; }
+  clearInterval(blink); clearAll();
+  const f = $("#fieldw");
+  f.style.background = "var(--name)";          /* 맞음 — 칸이 흰색으로 물듭니다 */
+  later(200, () => {
+    f.style.background = ""; $("#kbw").classList.remove("on"); toP5();
+  });
+};
+function sayW(t){
+  $("#msgw").textContent = t;
+  later(1400, () => { if($("#msgw").textContent === t) $("#msgw").textContent = ""; });
+}
+function shakeW(){
+  const box = $("#fieldw");
+  [0,1,2,3,4,5].forEach(i => later(i*50, () => {
+    box.style.transform = `translateX(${[8,-8,8,-8,4,0][i]}px)`;
+  }));
+}
+
+/* 힌트 — 두 번까지. 쓴 것은 지워지지 않고 쌓입니다.
+   ① 방향   ② 글자 수를 네모로. 두 어절이면 사이를 띄워 나눔까지 보입니다.
+   ⭐ 버튼에 **남은 개수**를 답니다 — 더 있는 줄 모르고 안 쓰는 사람이 생깁니다
+      (2026.08.14 사용자 "힌트가 몇개인지 보여주는 게 좋을 것 같아") */
+const HINT_MAX = 2;
+const ARROW = {"가로":"→", "세로":"↓", "대각선 ↘":"↘", "대각선 ↗":"↗"};
+function paintHintBtn(){
+  const left = HINT_MAX - hintsUsed;
+  $("#hintBtn").textContent = `힌트 ${left}개`;
+  $("#hintBtn").className = left ? "" : "off";
+}
+$("#hintBtn").onclick = () => {
+  if(hintsUsed >= HINT_MAX) return;
+  hintsUsed++;
+  const h = document.createElement("div");
+  h.className = "h";
+  if(hintsUsed === 1){
+    /* 네 방향 모두 화살표를 답니다 — 대각선만 화살표가 있으면 가로·세로가
+       덜 알려 준 것처럼 보입니다 (2026.08.14 사용자) */
+    h.innerHTML = `<span class="k">방향</span>`
+                + `<span>${cur.d.split(" ")[0]} ${ARROW[cur.d]}</span>`;
+  } else {
+    const grp = cur.w.split(" ")
+      .map(g => `<span class="grp">${[...g].map(() => "<i></i>").join("")}</span>`).join("");
+    h.innerHTML = `<span class="k">글자 수</span><span class="boxes">${grp}</span>`;
+  }
+  $("#hints").appendChild(h);
+  paintHintBtn();
+  $("#hiddenw").focus();
+  gauge();
+};
+$("#backw").onclick = () => {
+  clearInterval(blink); clearAll();
+  $("#kbw").classList.remove("on");
+  show("v4"); back = "v4";
+};
+
 /* ── P5 ─────────────────────────────────────────────────────── */
 function toP5(){
   clearInterval(blink); clearAll();
   mine = ""; $("#hidden").value = "";
   show("v5"); back = "v5";
   const w = $("#word"), ins = $("#instr"), f = $("#field");
-  w.textContent = ""; ins.innerHTML = ""; f.className = "field draw"; f.innerHTML = "";
-  $("#ent").className = "";
+  w.textContent = ""; ins.innerHTML = "";
+  f.className = "field draw";        /* ⛔ innerHTML을 비우지 말 것 — 입력 칸이 지워집니다 */
+  $("#ent").className = "ent";
 
   /* ① 단어가 위에서 떨어져 내려와 자리에 박힙니다 (칸 단위로 뚝뚝) */
   const DROP = 6;
@@ -401,42 +595,42 @@ function toP5(){
       ins.innerHTML = s.replace(key, `<b>${key}</b>`);
     });
 
-  /* ③ 밑줄이 왼쪽→오른쪽으로 그어지고 커서가 깜빡입니다 */
+  /* ③ 밑줄이 왼쪽→오른쪽으로 그어집니다 */
   const B = A + full.length*TYPE_MS + 100;
   later(B, () => { f.className = "field"; paintField(); });
-  later(B + 60, () => {
-    blink = setInterval(() => { caretOn = !caretOn; paintField(); }, BLINK);
-  });
 
   /* ④ 그 다음에야 포커스 — 키보드가 단어 떨어지는 장면을 덮지 않게(6.5).
-        이때 키보드가 올라오고 판이 그만큼 위로 밀립니다 */
-  later(B + 200, () => { $("#hidden").focus(); $("#kb").classList.add("on"); });
-  gauge(B + 200);
+        이때 키보드가 올라오고 판이 그만큼 위로 밀립니다.
+        커서는 이제 입력 칸이 스스로 깜빡입니다 */
+  later(B + 150, () => { $("#hidden").focus(); $("#kb").classList.add("on"); });
+  gauge(B + 150);
 }
+/* 이제 글자는 입력 칸이 스스로 그립니다 — 여기서는 ENT의 켜짐만 봅니다.
+   ⚠️ 「ent」를 반드시 남겨 둡니다 — className을 통째로 덮어쓰면 이 클래스가 떨어져 나가
+      버튼이 브라우저 기본 모양(작은 회색 버튼)으로 돌아갑니다 */
 function paintField(){
-  const f = $("#field");
-  if(f.classList.contains("draw")) return;
-  f.innerHTML = "";
-  [...mine].forEach(ch => { const s = document.createElement("span"); s.textContent = ch; f.appendChild(s); });
-  const c = document.createElement("span");
-  c.className = "caret" + (caretOn ? "" : " off");
-  f.appendChild(c);
-  $("#ent").className = mine.length ? "on" : "";
+  $("#ent").className = "ent" + (mine.trim().length ? " on" : "");
 }
 $("#hidden").addEventListener("input", e => {
   mine = e.target.value;      /* ⛔ 글자 수를 막지 않습니다(6.5) */
-  caretOn = true; paintField(); gauge();
+  paintField(); gauge();
 });
-$("#v5").addEventListener("click", e => { if(e.target.id !== "back") $("#hidden").focus(); });
+/* 빈 자리를 누르면 입력 칸으로 돌아옵니다. 단 버튼과 입력 칸 자신은 빼고 —
+   입력 칸을 다시 focus 하면 커서를 옮기려고 찍은 자리가 도로 끝으로 튑니다 */
+$("#v5").addEventListener("click", e => {
+  if(e.target.tagName !== "BUTTON" && e.target.tagName !== "INPUT") $("#hidden").focus();
+});
 
 /* ⑦ ENT — 두 단어가 붙어 쌍이 되어 날아올라 서랍 버튼에 박힙니다 */
 $("#ent").onclick = () => {
   if(!mine.length) return;
   clearInterval(blink); clearAll();
-  pairs.push({c:cur.c, w:cur.w, m:mine});
+  /* h — 이 단어를 찾는 데 쓴 힌트 수. pt — 그래서 받은 점수(SCORE) */
+  pairs.push({c:cur.c, w:cur.w, m:mine, h:hintsUsed, pt:SCORE[hintsUsed]});
   /* 진행자 화면이 받아 적습니다 — 세는 곳이 하나여야 스크린과 어긋나지 않습니다 */
   const nth = pairs.length;                    /* 이 쌍이 몇 번째인가 */
-  Bus.sayUntil({pair:{id:Bus.me(), nth, code:cur.c, word:cur.w, mine}},
+  Bus.sayUntil({pair:{id:Bus.me(), nth, code:cur.c, word:cur.w, mine,
+                      hints:hintsUsed, pt:SCORE[hintsUsed]}},
                b => ((((b.ack||{})[Bus.me()]||{}).p)||[]).includes(nth));
   /* 폰 안에도 적어 둡니다 — P6가 이 쌍으로 카드를 만듭니다 (6.4 ⑦) */
   localStorage.setItem("dlk.pairs." + Bus.me(), JSON.stringify(pairs));
@@ -508,7 +702,11 @@ function openDrawer(){
     later(i*40, () => L.style.transform = `translateY(${Math.round((1-i/6) * -60)}px)`);
 }
 $("#drawerBtn").onclick = () => {
-  if($("#drawer").classList.contains("on")){ show(back); if(back === "v5") $("#hidden").focus(); }
+  if($("#drawer").classList.contains("on")){
+    show(back);
+    if(back === "v5") $("#hidden").focus();
+    if(back === "v5w") $("#hiddenw").focus();
+  }
   else openDrawer();
 };
 
@@ -527,9 +725,10 @@ let toastTimer = null;
       1위 하나로 좁혀 두었던 안은 폐기 — 문구는 등수만 갈아 끼웁니다 */
 function toast(which, no, team){
   const t = $("#toast");
+  /* 변동은 안 알립니다 — 「2위 → 1위」가 아니라 지금 몇 위인지만 (2026.08.14 사용자) */
   t.innerHTML = which === 1
     ? `현재 ${no}위`
-    : (team || `CREATIVE RISK-TAKERS<br>2위 → 1위`);
+    : (team || `CREATIVE RISK-TAKERS<br>현재 1위`);
   clearTimeout(toastTimer);
   t.classList.add("on");
   toastTimer = setTimeout(() => t.classList.remove("on"), TOAST_MS);
@@ -563,18 +762,23 @@ function start(){
   const g = "포스터 코드 입력";
   for(let i=1;i<=g.length;i++)
     later(i*TYPE_MS, () => { if(!allDone) $("#g4").textContent = g.slice(0,i); });
-  /* 지시문 두 종류를 다 눌러 볼 수 있게 A·B 코드를 하나씩 적어 둡니다 */
+  /* 지시문 두 종류를 다 눌러 볼 수 있게 A·B 코드를 하나씩 적어 둡니다.
+     ⚠️ 여기 적힌 단어는 **조작줄에만** 있습니다 — 폰 화면에는 끝까지 안 뜹니다 */
   const a = POSTERS.find(p => p.p === "A"), b = POSTERS.find(p => p.p === "B");
   $("#hint").textContent =
-    `반대말(A)은 ${a.c} ${a.w} · 비슷한 말(B)은 ${b.c} ${b.w}`;
+    `반대말(A)은 ${a.c}(단어 「${a.w}」) · 비슷한 말(B)은 ${b.c}(단어 「${b.w}」)`;
   gauge();
 }
 
 function gauge(extra){
   const view = $("#drawer").classList.contains("on") ? "서랍"
-             : ($("#v5").classList.contains("on") ? "P5 반대말 입력" : "P4 코드 입력");
+             : ($("#v5").classList.contains("on") ? "P5 반대말 입력"
+             : ($("#v5w").classList.contains("on") ? `P5단 단어 입력 (힌트 ${hintsUsed}/2)`
+             : "P4 코드 입력"));
+  const pts = pairs.reduce((s,p) => s + (p.pt || 0), 0);
   $("#gauge").textContent =
-    `폰 390×844 · 지금 ${view} · 모은 쌍 ${pairs.length}개 / 포스터 30장`
+    `폰 390×844 · 지금 ${view} · 모은 쌍 ${pairs.length}개 / 포스터 30장 · 수집 점수 ${pts}`
+    + ` · 배점 혼자 ${SCORE[0]} · 힌트①뒤 ${SCORE[1]} · 힌트②뒤 ${SCORE[2]}`
     + ` · 코드 3자리(난수) · 지시문 A ${POSTERS.filter(p=>p.p==="A").length} · B ${POSTERS.filter(p=>p.p==="B").length}`
     + ` · 글자 크기 — 포스터 단어 48px · 게임 이름/지시문/서랍 한 줄/뒤로/ENT 24px`
     + ` · 서랍은 모은 줄만(빈 슬롯 없음) · 긴 줄은 자르지 않고 줄을 넘김`
@@ -594,18 +798,23 @@ $("#rank2").onclick  = () => toast(2);
 $("#fill").onclick = () => {
   start();
   later(50, () => {
-    POSTERS.slice(0,5).forEach((p,i) => pairs.push({c:p.c, w:p.w, m:["차가운 계산","배척","익숙함","포기","서늘한 이성"][i]}));
+    POSTERS.slice(0,5).forEach((p,i) => pairs.push({c:p.c, w:p.w,
+      m:["차가운 계산","배척","익숙함","포기","서늘한 이성"][i],
+      h:[0,1,0,2,1][i], pt:SCORE[[0,1,0,2,1][i]]}));
     gauge();
   });
 };
 $("#done").onclick = () => {
   start();
-  later(50, () => { POSTERS.forEach(p => pairs.push({c:p.c, w:p.w, m:"내가 쓴 말"})); finishAll(); gauge(); });
+  later(50, () => {
+    POSTERS.forEach(p => pairs.push({c:p.c, w:p.w, m:"내가 쓴 말", h:0, pt:SCORE[0]}));
+    finishAll(); gauge();
+  });
 };
 
 function fit(){
   const p = $("#phone");
-  const avail = innerHeight - document.querySelector(".ctl").offsetHeight - 40;
+  const avail = innerHeight - (document.querySelector(".ctl")?.offsetHeight || 0) - 40;
   const s = Math.min(1, avail / 844);
   p.style.transform = `scale(${s})`;
   p.style.marginBottom = (844 * (s-1)) + "px";
@@ -616,8 +825,21 @@ start();
 
 /* 목업 확인용 — 주소로 화면을 바로 띄웁니다 (?v=5 · ?v=drawer) */
 const q = new URLSearchParams(location.search);
+/* ?play — 실제 플레이 차림. 조작줄과 가짜 키보드 자리를 내립니다.
+   폰(손가락으로 만지는 기기)에서는 이걸 안 붙여도 자동으로 내려갑니다 */
+if(q.has("play")){ document.body.classList.add("play"); fit(); }
 if(q.get("v") === "5"){ cur = POSTERS[0]; later(60, toP5); }
-if(q.get("v") === "done") later(80, () => { POSTERS.forEach(p => pairs.push({c:p.c,w:p.w,m:"내가 쓴 말"})); finishAll(); gauge(); });
+/* ?v=word — 단어 입력 화면. &h=1·2를 붙이면 힌트를 그만큼 쓴 상태로 뜹니다 */
+if(q.get("v") === "word"){
+  cur = POSTERS[+(q.get("i") || 0)] || POSTERS[0];
+  later(60, toWord);
+  /* toWord()가 timers를 비우므로 여기서는 later()를 안 씁니다 */
+  const h = +(q.get("h") || 0);
+  for(let i=0;i<h;i++) setTimeout(() => $("#hintBtn").click(), 1600 + i*40);
+}
+if(q.get("v") === "done") later(80, () => {
+  POSTERS.forEach(p => pairs.push({c:p.c,w:p.w,m:"내가 쓴 말",h:0,pt:SCORE[0]}));
+  finishAll(); gauge(); });
 if(q.get("v") === "toast") later(80, () => toast(2));
 if(q.get("v") === "donedrawer") later(80, () => {
   POSTERS.forEach(p => pairs.push({c:p.c, w:p.w, m:"차가운 계산 같은 긴 말"}));
@@ -635,9 +857,9 @@ if(q.get("v") === "drawer"){
 <script>
 /* ⭐ 6.12 순위 알림 — 개인은 1·2·3위에게, 팀은 그 팀 전원에게.
       수집이면 모은 쌍 수로 셉니다. 문구는 두 단계가 같습니다. */
-Bus.watchRank("got",
-  no => toast(1, no),
-  (label, from, to) => toast(2, 0, `${label}<br>${from}위 → ${to}위`));
+Bus.watchRank("got", a =>
+  a.kind === "me" ? toast(1, a.no)
+                  : toast(2, 0, `${a.label}<br>현재 ${a.no}위`));
 </script>
 </body>
 </html>
